@@ -1,3 +1,5 @@
+PyJWT
+bcrypt
 click==8.0.1
 dnspython==1.16.0
 Flask==2.0.1
