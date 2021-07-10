@@ -1,0 +1,6 @@
+.dockerignore
+Dockerfile
+.gitignore
+README.md
+set_env.bash
+decent/
