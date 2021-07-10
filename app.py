@@ -6,7 +6,6 @@ from routes import add_storage_urls, add_user_urls
 app = Flask(__name__)
 database = None
 secret_key = None
-code = None
 
 
 def initialize(env):
@@ -42,7 +41,6 @@ def run(env):
         client = pymongo.MongoClient(database_uri)
         database = client[database_name]
         secret_key = app.config['SECRET_KEY']
-        code = app.config['CODE_KEY']
         # Add routes
         add_storage_urls()
         add_user_urls()

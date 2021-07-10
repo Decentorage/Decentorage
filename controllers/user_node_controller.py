@@ -1,5 +1,5 @@
 from flask import request, Response
-from handlers import add_user, verify_user, create_token
+from handlers import add_user, verify_user, create_token, authorize
 
 
 def signup():
@@ -28,3 +28,9 @@ def signin():
             return Response("wrong password or username", status=403, mimetype='application/text')
     else:
         return Response("missing parameters", status=400, mimetype='application/text')
+
+
+@authorize
+def test(authorized_username):
+    print(authorized_username)
+    return Response("success", status=201, mimetype='application/text')

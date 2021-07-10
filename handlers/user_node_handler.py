@@ -1,6 +1,8 @@
 import bcrypt
 import app
 import jwt
+from flask import abort, request
+from functools import wraps
 import datetime
 from datetime import timedelta
 
@@ -33,8 +35,7 @@ def add_user(username, password):
 def verify_user(username, password):
     """
     verify user. password is hashed.
-    investigate whether the user is on the system or not, by calling another function
-    in the query factory that access the database.
+    investigate whether the user is on the system or not
     *Parameters:*
         - *username(string)*: holds the value of the username.
         - *password(string)*: holds the value of the password.
@@ -68,7 +69,7 @@ def create_token(username, password):
     *Returns:*
         -*Token*:the token created.
     """
-    exp = datetime.datetime.utcnow() + timedelta(days=1)
+    exp = datetime.datetime.utcnow() + timedelta(days=30)
     payload = {
         'username': username,
         'password': password,
@@ -77,3 +78,38 @@ def create_token(username, password):
     token = jwt.encode(payload, app.secret_key, algorithm='HS256')
     return token
 
+
+def authorize(f):
+    """
+    Token verification Decorator. This decorator validate the token passed in the header with the endpoint.
+    *Returns:*
+        -*Error Response,401*: if the token is not given in the header, expired or invalid.
+                                Or the user is not on the system.
+        -*Username*:if the token is valid it allows the access and return the username of the user.
+    """
+
+    @wraps(f)  # pragma:no cover
+    def decorated(*args, **kwargs):
+        token = None
+        user = None
+        if 'TOKEN' in request.headers:
+            token = request.headers['TOKEN']
+
+        if not token:
+            abort(401, 'Token is missing.')
+
+        try:
+            user = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+
+        except jwt.ExpiredSignatureError:
+            abort(401, 'Signature expired. Please log in again.')
+
+        except jwt.InvalidTokenError:
+            abort(401, 'Invalid token. Please log in again.')
+
+        if not verify_user(user['username'], user['password']):
+            abort(401, 'No authorized user found.')
+
+        return f(authorized_username=user['username'], *args, **kwargs)
+
+    return decorated
