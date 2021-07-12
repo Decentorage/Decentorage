@@ -1,19 +1,21 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, create_token, authorize
+from handlers import add_user, verify_user, create_token, authorize, get_user_active_contracts
 
 
 def signup():
-    username = request.json["username"]
-    password = request.json["password"]
-    if username and password:
-        username_already_exists = add_user(username, password)
-        if username_already_exists:
-            return make_response("username already exits", 403)
+    try:
+        username = request.json["username"]
+        password = request.json["password"]
+        if username and password:
+            username_already_exists = add_user(username, password)
+            if username_already_exists:
+                return make_response("username already exits", 403)
+            else:
+                return make_response("success", 201)
         else:
-            return make_response("success", 201)
-    else:
-        return make_response("missing parameters", 400)
-
+            return make_response("missing parameters", 400)
+    except:
+        return make_response("Server error", 500)
 
 def signin():
     try:
@@ -30,6 +32,12 @@ def signin():
             return make_response("missing parameters", 400)
     except:
         return make_response("Server error", 500)
+
+
+@authorize
+def get_active_contracts(authorized_username):
+    files = get_user_active_contracts(authorized_username)
+    return make_response(jsonify(files), 200)
 
 
 @authorize
