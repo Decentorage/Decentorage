@@ -1,4 +1,3 @@
-from controllers.storage_node_controller import heartbeat
 import datetime
 import math
 import app
@@ -123,5 +122,7 @@ def withdraw_handler(storage_node_number):
     if storage_node:
         availability = get_availability(storage_node) # Availability in percentage [0, 100].
         # TODO: write withdrawing functions
+        if availability > 50:
+            
     else:
         return "Database error."
