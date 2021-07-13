@@ -1,5 +1,6 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, create_token, authorize, get_user_active_contracts
+from handlers import add_user, verify_user, authorize, get_user_active_contracts
+from utils import create_token
 
 
 def signup():
@@ -16,6 +17,7 @@ def signup():
             return make_response("missing parameters", 400)
     except:
         return make_response("Server error", 500)
+
 
 def signin():
     try:
