@@ -19,14 +19,12 @@ def get_user_active_contracts(username):
         users = app.database["user"]
         query = {"username": username}
         user = users.find_one(query)
-        if user:
-            if user['active_contracts']:
-                return user['active_contracts']
-            else:
-                return []
-        return False
+        if user['active_contracts']:
+            return user['active_contracts']
+        else:
+            return []
     except:
-        return False
+        return []
 
 
 def add_user(username, password):
