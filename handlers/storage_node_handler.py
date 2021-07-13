@@ -1,22 +1,32 @@
 import datetime
 import math
 import app
+<<<<<<< HEAD
 import web3_library
 import os
 #_________________________________ Check database functions _________________________________#
+=======
+from functools import wraps
+from flask import abort, request
+import jwt
+from utils import registration_verify_user, registration_add_user, Configuration
+# _________________________________ Check database functions _________________________________#
+
+
+>>>>>>> 58f2badde2b0b223fd654d3936ea8415e7bb3573
 def get_storage_nodes_collection():
     if app.database:
         return app.database["storage_nodes"]
     else:
         return False
 
-#_________________________________ Heartbeat handler functions _________________________________#
+# _________________________________ Heartbeat handler functions _________________________________#
 
 # How many minutes between each heartbeat
-intraheartbeat_minutes = 10
-# How often does availability reset
-resetting_months = 2
-decentorage_epoch = datetime.datetime(2020,1,1) # Time at which intervals started
+intraheartbeat_minutes = Configuration.intraheartbeat_minutes
+resetting_months = Configuration.resetting_months
+decentorage_epoch = Configuration.decentorage_epoch
+# 
 
 
 def get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch):
@@ -35,6 +45,7 @@ def get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
     if next_interval_start_month == 0:
         next_interval_start_month = 12
     return datetime.datetime(next_interval_start_year,next_interval_start_month,1)
+
 
 def heartbeat_handler(storage_node_number):
     storage_nodes  = get_storage_nodes_collection()
@@ -74,20 +85,64 @@ def heartbeat_handler(storage_node_number):
         else:
             return "Heartbeat ignored"
 
+# _________________________________ Registrations _________________________________#
 
 
-#_________________________________ Withdraw handler functions _________________________________#
+def add_storage(username, password):
+    return registration_add_user(username, password, "storage")
 
 
-def get_percentage(hearbteats, full_heartbeats):
-    percentage = hearbteats / full_heartbeats * 100
+def verify_storage(username, password):
+    return registration_verify_user(username, password, "storage")
+
+
+def authorize_storage(f):
+    """
+    Token verification Decorator. This decorator validate the token passed in the header with the endpoint.
+    *Returns:*
+        -*Error Response,401*: if the token is not given in the header, expired or invalid.
+                                Or the user is not on the system.
+        -*Username*:if the token is valid it allows the access and return the username of the user.
+    """
+
+    @wraps(f)  # pragma:no cover
+    def decorated(*args, **kwargs):
+        token = None
+        user = None
+        if 'TOKEN' in request.headers:
+            token = request.headers['TOKEN']
+
+        if not token:
+            abort(401, 'Token is missing.')
+
+        try:
+            user = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+
+        except jwt.ExpiredSignatureError:
+            abort(401, 'Signature expired. Please log in again.')
+
+        except jwt.InvalidTokenError:
+            abort(401, 'Invalid token. Please log in again.')
+
+        if not verify_storage(user['username'], user['password']):
+            abort(401, 'No authorized user found.')
+
+        return f(authorized_username=user['username'], *args, **kwargs)
+
+    return decorated
+
+# _________________________________ Withdraw handler functions _________________________________#
+
+
+def get_percentage(heartbeats, full_heartbeats):
+    percentage = heartbeats / full_heartbeats * 100
     return max(min(100, percentage), 0)
 
 
 def get_availability(storage_node):
     last_heartbeat = storage_node["last_heartbeat"]
     heartbeats = storage_node["heartbeats"]
-    if heartbeats == 0: # New node
+    if heartbeats == 0:     # New node
         return 0
     now = datetime.datetime.utcnow()
     years_since_epoch = now.year - decentorage_epoch.year
@@ -101,13 +156,16 @@ def get_availability(storage_node):
     heartbeats += 1 # Taking current slot into account
     availability = get_percentage(heartbeats, full_availability_heartbeats)
     if last_heartbeat == -2: # transition state
-        if now - last_interval_start_datetime <= datetime.timedelta(minutes=intraheartbeat_minutes): # First slot in new interval
+        # First slot in new interval
+        if now - last_interval_start_datetime <= datetime.timedelta(minutes=intraheartbeat_minutes):
             return 100
-        elif next_interval_start_datetime - now <= datetime.timedelta(minutes=intraheartbeat_minutes): # Last slot in old interval
+        # Last slot in old interval
+        elif next_interval_start_datetime - now <= datetime.timedelta(minutes=intraheartbeat_minutes):
             return availability
-        else: # new interval but not first slot
+        # new interval but not first slot
+        else:
             return 0
-    elif last_heartbeat == -1: # New node
+    elif last_heartbeat == -1:  # New node
         return 0
     else:
         return availability
@@ -121,9 +179,9 @@ def withdraw_handler(storage_node_number):
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
     if storage_node:
-        availability = get_availability(storage_node) # Availability in percentage [0, 100].
+        availability = get_availability(storage_node)   # Availability in percentage [0, 100].
         # TODO: write withdrawing functions
-        if availability < 50:
+        if availability > Configuration.minimum_availability:
             # address = get_contract_address(storage)
             # contract = get_contract(address)
             contract = web3_library.get_contract()

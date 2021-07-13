@@ -1,8 +1,11 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, create_token, authorize, get_user_active_contracts
+from handlers import add_user, verify_user, authorize, get_user_active_contracts, get_user_state
+from utils import create_token
 
 
-def signup():
+# __________________________ Unauthorized requests __________________ #
+
+def user_signup():
     try:
         username = request.json["username"]
         password = request.json["password"]
@@ -17,7 +20,8 @@ def signup():
     except:
         return make_response("Server error", 500)
 
-def signin():
+
+def user_signin():
     try:
         username = request.json["username"]
         password = request.json["password"]
@@ -32,6 +36,13 @@ def signin():
             return make_response("missing parameters", 400)
     except:
         return make_response("Server error", 500)
+# __________________________ Authorized requests __________________ #
+
+
+@authorize
+def get_state(authorized_username):
+    state = get_user_state(authorized_username)
+    return make_response(jsonify({'state': state}), 200)
 
 
 @authorize
