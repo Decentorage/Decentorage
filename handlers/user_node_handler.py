@@ -48,7 +48,7 @@ def get_user_state(username):
         else:
             return '3'
     except:
-        return []
+        return '3'
 
 
 def authorize(f):
