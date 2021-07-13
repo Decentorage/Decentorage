@@ -7,6 +7,26 @@ import datetime
 from datetime import timedelta
 
 
+def get_user_active_contracts(username):
+    """
+        get user active contracts
+        *Parameters:*
+            - *username(string)*: holds the value of the username.
+        *Returns:*
+           - List of active contracts of a specific user.
+    """
+    try:
+        users = app.database["user"]
+        query = {"username": username}
+        user = users.find_one(query)
+        if user['active_contracts']:
+            return user['active_contracts']
+        else:
+            return []
+    except:
+        return []
+
+
 def add_user(username, password):
     """
     Add user to the system

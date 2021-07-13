@@ -1,36 +1,46 @@
-from flask import request, Response
-from handlers import add_user, verify_user, create_token, authorize
+from flask import request, jsonify, make_response
+from handlers import add_user, verify_user, create_token, authorize, get_user_active_contracts
 
 
 def signup():
-    username = request.json["username"]
-    password = request.json["password"]
-    if username and password:
-        username_already_exists = add_user(username, password)
-        if username_already_exists:
-            return Response("username already exits", status=403, mimetype='application/text')
+    try:
+        username = request.json["username"]
+        password = request.json["password"]
+        if username and password:
+            username_already_exists = add_user(username, password)
+            if username_already_exists:
+                return make_response("username already exits", 403)
+            else:
+                return make_response("success", 201)
         else:
-            return Response("success", status=201, mimetype='application/text')
-    else:
-        return Response("missing parameters", status=400, mimetype='application/text')
-
+            return make_response("missing parameters", 400)
+    except:
+        return make_response("Server error", 500)
 
 def signin():
-    username = request.json["username"]
-    password = request.json["password"]
-    if username and password:
-        is_verified = verify_user(username, password)
-        if is_verified:
-            print("token")
-            token = create_token(username, password)
-            return Response("{'token': "+token+"}", status=200, mimetype='application/json')
+    try:
+        username = request.json["username"]
+        password = request.json["password"]
+        if username and password:
+            is_verified = verify_user(username, password)
+            if is_verified:
+                token = create_token(username, password)
+                return make_response(jsonify({'token': token}), 200)
+            else:
+                return make_response("wrong password or username", 403)
         else:
-            return Response("wrong password or username", status=403, mimetype='application/text')
-    else:
-        return Response("missing parameters", status=400, mimetype='application/text')
+            return make_response("missing parameters", 400)
+    except:
+        return make_response("Server error", 500)
+
+
+@authorize
+def get_active_contracts(authorized_username):
+    files = get_user_active_contracts(authorized_username)
+    return make_response(jsonify(files), 200)
 
 
 @authorize
 def test(authorized_username):
     print(authorized_username)
-    return Response("success", status=201, mimetype='application/text')
+    return make_response("success", 201)
