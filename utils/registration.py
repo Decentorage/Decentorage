@@ -26,8 +26,12 @@ def registration_add_user(username, password, user_type):
             return True
         # Hash a password for the first time, with a randomly-generated salt
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), 'requests': [],
-                          'active_contracts': []})
+        if user_type == "user":
+            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), 'requests': [],
+                              'active_contracts': []})
+        else:
+            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
+                              "last_heartbeat": -1})
         return False
     except:
         return True

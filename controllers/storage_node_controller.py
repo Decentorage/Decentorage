@@ -12,7 +12,7 @@ def heartbeat():
         return "storage node parameter not provided in get request"
 
 
-def signup():
+def storage_signup():
     try:
         username = request.json["username"]
         password = request.json["password"]
@@ -28,7 +28,7 @@ def signup():
         return make_response("Server error", 500)
 
 
-def signin():
+def storage_signin():
     try:
         username = request.json["username"]
         password = request.json["password"]
