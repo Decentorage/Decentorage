@@ -44,4 +44,4 @@ def run(env):
         # Add routes
         add_storage_urls()
         add_user_urls()
-        app.run(host="0.0.0.0")
+        app.run(host="0.0.0.0", port=5000)
