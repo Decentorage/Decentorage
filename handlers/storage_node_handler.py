@@ -174,7 +174,7 @@ def withdraw_handler(storage_node_number):
     if storage_node:
         availability = get_availability(storage_node)   # Availability in percentage [0, 100].
         # TODO: write withdrawing functions
-        if availability > 50:
+        if availability > Configuration.minimum_availability:
             pass
     else:
         return "Database error."
