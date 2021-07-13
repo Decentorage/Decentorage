@@ -5,7 +5,7 @@ from utils import create_token
 
 # __________________________ Unauthorized requests __________________ #
 
-def signup():
+def user_signup():
     try:
         username = request.json["username"]
         password = request.json["password"]
@@ -21,7 +21,7 @@ def signup():
         return make_response("Server error", 500)
 
 
-def signin():
+def user_signin():
     try:
         username = request.json["username"]
         password = request.json["password"]
