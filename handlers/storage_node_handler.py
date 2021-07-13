@@ -4,7 +4,7 @@ import app
 from functools import wraps
 from flask import abort, request
 import jwt
-from utils import registration_verify_user, registration_add_user
+from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
 
 
@@ -17,10 +17,10 @@ def get_storage_nodes_collection():
 # _________________________________ Heartbeat handler functions _________________________________#
 
 # How many minutes between each heartbeat
-intraheartbeat_minutes = 10
-# How often does availability reset
-resetting_months = 2
-decentorage_epoch = datetime.datetime(2020,1,1) # Time at which intervals started
+intraheartbeat_minutes = Configuration.intraheartbeat_minutes
+resetting_months = Configuration.resetting_months
+decentorage_epoch = Configuration.decentorage_epoch
+# 
 
 
 def get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch):
