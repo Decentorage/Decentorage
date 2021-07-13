@@ -11,6 +11,6 @@ def add_storage_urls():
     # Post Methods
     app.app.add_url_rule(storage_url_prefix + "/signup", view_func=signup, methods=["POST"])
     app.app.add_url_rule(storage_url_prefix + "/signin", view_func=signin, methods=["POST"])
-    app.app.add_url_rule(storage_url_prefix + "/auditResponse", methods=["POST"])  # result
-    app.app.add_url_rule(storage_url_prefix + "/clientConnectionPort", methods=["POST"])  # port, communication port
-    app.app.add_url_rule(storage_url_prefix + "/publicIpChange", methods=["POST"])  # decentorage port, ip_address
+    # app.app.add_url_rule(storage_url_prefix + "/auditResponse", methods=["POST"])  # result
+    # app.app.add_url_rule(storage_url_prefix + "/clientConnectionPort", methods=["POST"])  # port, communication port
+    # app.app.add_url_rule(storage_url_prefix + "/publicIpChange", methods=["POST"])  # decentorage port, ip_address

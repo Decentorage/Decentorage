@@ -33,6 +33,24 @@ def verify_user(username, password):
     return registration_verify_user(username, password, "user")
 
 
+def get_user_state(username):
+    try:
+        users = app.database["user"]
+        query = {"username": username}
+        user = users.find_one(query)
+        # State 1: there is a pending contract instance
+        if user['request']:
+            return '1'
+        # State 2: no pending contract instance and there is money to initiate request
+        elif user['available_request_count'] > 0:
+            return '2'
+        # State 3: no pending contract instance and no money to initiate request
+        else:
+            return '3'
+    except:
+        return []
+
+
 def authorize(f):
     """
     Token verification Decorator. This decorator validate the token passed in the header with the endpoint.
