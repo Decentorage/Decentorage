@@ -1,6 +1,7 @@
-from flask import request, make_response, jsonify
-from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage
+from flask import make_response, jsonify
+from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler
 from utils import create_token
+from flask import request
 
 
 def heartbeat():
@@ -48,3 +49,11 @@ def signin():
 def test(authorized_username):
     print(authorized_username)
     return make_response("success", 201)
+
+
+def withdraw():
+    if request.args.get("storage_node"):
+        storage_node_number = request.args.get("storage_node")
+        return withdraw_handler(storage_node_number)
+    else:
+        return "storage node parameter not provided in get request"

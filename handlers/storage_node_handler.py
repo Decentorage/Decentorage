@@ -5,6 +5,16 @@ from functools import wraps
 from flask import abort, request
 import jwt
 from utils import registration_verify_user, registration_add_user
+# _________________________________ Check database functions _________________________________#
+
+
+def get_storage_nodes_collection():
+    if app.database:
+        return app.database["storage_nodes"]
+    else:
+        return False
+
+# _________________________________ Heartbeat handler functions _________________________________#
 
 # How many minutes between each heartbeat
 intraheartbeat_minutes = 10
@@ -32,10 +42,10 @@ def get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
 
 
 def heartbeat_handler(storage_node_number):
-    if app.database:
-        storage_nodes = app.database["storage_nodes"]
-    else:
-        return "database error"
+    storage_nodes  = get_storage_nodes_collection()
+    if not storage_nodes:
+        return "Database error."
+    
     query = {"storage_node_id": int(storage_node_number)}
     storage_node = storage_nodes.find_one(query)
     
@@ -47,8 +57,6 @@ def heartbeat_handler(storage_node_number):
         next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
         new_last_heartbeat = now - datetime.timedelta(minutes=now.minute % intraheartbeat_minutes - intraheartbeat_minutes,
                                                       seconds=now.second, microseconds=now.microsecond)
-        print(now - datetime.timedelta(minutes=now.minute % intraheartbeat_minutes - 10 * intraheartbeat_minutes,
-                                                      seconds=now.second, microseconds=now.microsecond))
         if new_last_heartbeat >= next_interval_start_datetime: # if new heartbeat is in new interval, flag new last heartbeat = -2
             new_last_heartbeat = -2
         
@@ -70,6 +78,8 @@ def heartbeat_handler(storage_node_number):
             return "Heartbeat successful"
         else:
             return "Heartbeat ignored"
+
+# _________________________________ Registrations _________________________________#
 
 
 def add_storage(username, password):
@@ -114,3 +124,57 @@ def authorize_storage(f):
         return f(authorized_username=user['username'], *args, **kwargs)
 
     return decorated
+
+# _________________________________ Withdraw handler functions _________________________________#
+
+
+def get_percentage(heartbeats, full_heartbeats):
+    percentage = heartbeats / full_heartbeats * 100
+    return max(min(100, percentage), 0)
+
+
+def get_availability(storage_node):
+    last_heartbeat = storage_node["last_heartbeat"]
+    heartbeats = storage_node["heartbeats"]
+    if heartbeats == 0:     # New node
+        return 0
+    now = datetime.datetime.utcnow()
+    years_since_epoch = now.year - decentorage_epoch.year
+    months_since_epoch = now.month - decentorage_epoch.month
+    last_interval_start_datetime = get_last_interval_start_datetime(now,years_since_epoch,months_since_epoch)
+    next_interval_start_datetime = get_next_interval_start_datetime(now,years_since_epoch,months_since_epoch)
+    full_availability_heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
+    if full_availability_heartbeats == 0:
+        return 100
+    
+    heartbeats += 1 # Taking current slot into account
+    availability = get_percentage(heartbeats, full_availability_heartbeats)
+    if last_heartbeat == -2: # transition state
+        # First slot in new interval
+        if now - last_interval_start_datetime <= datetime.timedelta(minutes=intraheartbeat_minutes):
+            return 100
+        # Last slot in old interval
+        elif next_interval_start_datetime - now <= datetime.timedelta(minutes=intraheartbeat_minutes):
+            return availability
+        # new interval but not first slot
+        else:
+            return 0
+    elif last_heartbeat == -1:  # New node
+        return 0
+    else:
+        return availability
+
+
+def withdraw_handler(storage_node_number):
+    storage_nodes  = get_storage_nodes_collection()
+    if not storage_nodes:
+        return "Database error."
+    query = {"storage_node_id": int(storage_node_number)}
+    storage_node = storage_nodes.find_one(query)
+    if storage_node:
+        availability = get_availability(storage_node)   # Availability in percentage [0, 100].
+        # TODO: write withdrawing functions
+        if availability > 50:
+            pass
+    else:
+        return "Database error."
