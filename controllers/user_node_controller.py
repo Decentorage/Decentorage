@@ -1,6 +1,7 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state, create_file_handler
 from utils import create_token
+import json
 
 
 # __________________________ Unauthorized requests __________________ #
@@ -55,7 +56,9 @@ def get_active_contracts(authorized_username):
 def create_file(authorized_username):
     if get_user_state(authorized_username) != '2':
         return make_response("No contract requests available.", 403)
-    return create_file_handler(authorized_username, request.json)
+    response = create_file_handler(authorized_username, json.loads(request.json))
+    if response:
+        return make_response("File created successfully", 201)
 
 
 @authorize_user

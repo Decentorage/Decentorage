@@ -71,17 +71,17 @@ def heartbeat_handler(authorized_username):
             heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            flask.Response(status=200, response="Heartbeat successful.")
         elif node_last_heartbeat == -2 or node_last_heartbeat < last_interval_start_datetime: # First heartbeat in new interval
             heartbeats = 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            flask.Response(status=200, response="Heartbeat successful.")
         elif node_last_heartbeat < now: # regular update
             heartbeats = int(storage_node["heartbeats"]) + 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            flask.Response(status=200, response="Heartbeat successful.")
         else:
             abort(429, 'Heartbeat Ignored')
 

@@ -1,4 +1,3 @@
-from pymongo.common import validate_positive_integer_or_none
 import app
 import jwt
 from flask import abort, request
@@ -93,27 +92,36 @@ def authorize_user(f):
 
 
 def create_file_handler(authorized_username, new_file):
-    if not all (parameter in new_file for parameter in ("segments","segments_count","download_counts","file_size","filename","download_counts","duration_in_months")):
-        return abort(400, "Invalid json object")
+    if not all(parameter in new_file for parameter in ("segments", "segments_count", "download_count",
+                                                       "file_size", "filename", "duration_in_months")):
+        abort(400, "Invalid json object")
     new_file_segments = new_file["segments"]
     for segment in new_file_segments:
-        if not all (parameter in segment for parameter in ("k","m","shard_size")):
-            return abort(400, "Invalid json object")
-    filename = new_file["filename"]
-    
+        if not all(parameter in segment for parameter in ("k", "m", "shard_size")):
+            abort(400, "Invalid json object")
+    filename = new_file['filename']
+
     # TODO create empty contract
     files = app.database["files"]
+    users = app.database["user"]
     if not files:
-        return abort(500, "Database error.")
+        abort(500, "Database error.")
     query = {
-        "filename":new_file["filename"],
-        "segments_count":new_file["segments_count"],
-        "file_size":new_file["file_size"],
-        "download_counts":new_file["download_counts"],
-        "duration_in_months":new_file["duration_in_months"],
-        "contract":"",
+        'username': authorized_username,
+        'filename': filename
+    }
+    file = files.find_one(query)
+    if file:
+        abort(409, "Duplicate Files.")
+    query = {
+        "filename": new_file["filename"],
+        "segments_count": new_file["segments_count"],
+        "file_size": new_file["file_size"],
+        "download_count": new_file["download_count"],
+        "duration_in_months": new_file["duration_in_months"],
+        "contract": "",
         "username": authorized_username,
-        "done_uploading":False
+        "done_uploading": False
         }
     _id = files.insert_one(query).inserted_id
     segments_list = []
@@ -122,24 +130,26 @@ def create_file_handler(authorized_username, new_file):
         total_shards = segment["k"] + segment["m"]
         shard_list = []
         for i in range(total_shards):
-            shard_id = _id + "$DCNTRG$" + segment_no + "$DCNTRG$" + i
-            shard_id = app.fernet.encrypt(shard_id)
+            shard_id = str(_id) + "$DCNTRG$" + str(segment_no) + "$DCNTRG$" + str(i)
+            shard_id = shard_id.encode('utf-8')
+            shard_id = app.fernet.encrypt(shard_id).decode('utf-8')
             shard_list.append(
                 {
-                    "shard_id":shard_id,
-                    "shard_node_username":"",
-                    "done_uploading":False
+                    "shard_id": shard_id,
+                    "shard_node_username": "",
+                    "done_uploading": False
                 }
             )
         segments_list.append({
-            "k":segment["k"],
-            "m":segment["m"],
-            "shard_size":segment["shard_size"],
-            "shards":shard_list
+            "k": segment["k"],
+            "m": segment["m"],
+            "shard_size": segment["shard_size"],
+            "shards": shard_list
         })
-    query = { "_id": _id }
-    newvalues = { "$set": { "segments": segments_list } }
+    query = {"_id": _id}
+    newvalues = {"$set": {"segments": segments_list}}
     files.update_one(query, newvalues)
+    return True
     
 
     

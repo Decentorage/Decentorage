@@ -28,7 +28,7 @@ def registration_add_user(username, password, user_type):
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         if user_type == "user":
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), 'request': False,
-                              'active_contracts': []})
+                              'active_contracts': [], 'available_request_count': 0})
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
                               "last_heartbeat": -1})
