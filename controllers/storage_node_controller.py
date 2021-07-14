@@ -1,15 +1,13 @@
 from flask import make_response, jsonify
-from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler
+from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler, get_availability_handler
 from utils import create_token
 from flask import request
 
 
-def heartbeat():
-    if request.args.get("storage_node"):
-        storage_node_number = request.args.get("storage_node")
-        return heartbeat_handler(storage_node_number)
-    else:
-        return "storage node parameter not provided in get request"
+
+@authorize_storage
+def heartbeat(authorized_username):
+    return heartbeat_handler(authorized_username)
 
 
 def storage_signup():
@@ -51,9 +49,11 @@ def test(authorized_username):
     return make_response("success", 201)
 
 
-def withdraw():
-    if request.args.get("storage_node"):
-        storage_node_number = request.args.get("storage_node")
-        return withdraw_handler(storage_node_number)
-    else:
-        return "storage node parameter not provided in get request"
+@authorize_storage
+def withdraw(authorized_username):
+    return withdraw_handler(authorized_username)
+
+
+@authorize_storage
+def get_availability(authorized_username):
+    return get_availability_handler(authorized_username)

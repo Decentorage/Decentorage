@@ -1,5 +1,7 @@
 import datetime
 import math
+
+import flask
 import app
 import web3_library
 import os
@@ -43,12 +45,14 @@ def get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
     return datetime.datetime(next_interval_start_year,next_interval_start_month,1)
 
 
-def heartbeat_handler(storage_node_number):
+def heartbeat_handler(authorized_username):
     storage_nodes  = get_storage_nodes_collection()
     if not storage_nodes:
-        return "Database error."
-    
-    query = {"storage_node_id": int(storage_node_number)}
+        abort(500, "Database server error.")
+
+
+
+    query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     
     if storage_node:
@@ -67,19 +71,19 @@ def heartbeat_handler(storage_node_number):
             heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            return "Heartbeat successful"
+            flask.Response(status=200,response="Heartbeat successful.")
         elif node_last_heartbeat == -2 or node_last_heartbeat < last_interval_start_datetime: # First heartbeat in new interval
             heartbeats = 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            return "Heartbeat successful"
+            flask.Response(status=200,response="Heartbeat successful.")
         elif node_last_heartbeat < now: # regular update
             heartbeats = int(storage_node["heartbeats"]) + 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            return "Heartbeat successful"
+            flask.Response(status=200,response="Heartbeat successful.")
         else:
-            return "Heartbeat ignored"
+            abort(429, 'Heartbeat Ignored')
 
 # _________________________________ Registrations _________________________________#
 
@@ -167,11 +171,11 @@ def get_availability(storage_node):
         return availability
 
 
-def withdraw_handler(storage_node_number):
+def withdraw_handler(authorized_username):
     storage_nodes  = get_storage_nodes_collection()
     if not storage_nodes:
-        return "Database error."
-    query = {"storage_node_id": int(storage_node_number)}
+        abort(500, 'Database server error.')
+    query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
     if storage_node:
@@ -197,3 +201,15 @@ def withdraw_handler(storage_node_number):
             return "availability is not good enough"
     else:
         return "Database error."
+
+
+def get_availability_handler(authorized_username):
+    storage_nodes  = get_storage_nodes_collection()
+    if not storage_nodes:
+        abort(500, 'Database server error.')
+    query = {"username": authorized_username}
+    storage_node = storage_nodes.find_one(query)
+    availability = get_availability(storage_node)
+    print(availability)
+    return flask.Response(status=200,response=str(availability))
+

@@ -1,5 +1,5 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, authorize, get_user_active_contracts, get_user_state
+from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state
 from utils import create_token
 
 
@@ -39,19 +39,19 @@ def user_signin():
 # __________________________ Authorized requests __________________ #
 
 
-@authorize
+@authorize_user
 def get_state(authorized_username):
     state = get_user_state(authorized_username)
     return make_response(jsonify({'state': state}), 200)
 
 
-@authorize
+@authorize_user
 def get_active_contracts(authorized_username):
     files = get_user_active_contracts(authorized_username)
     return make_response(jsonify(files), 200)
 
 
-@authorize
+@authorize_user
 def test(authorized_username):
     print(authorized_username)
     return make_response("success", 201)
