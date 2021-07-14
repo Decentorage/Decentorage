@@ -5,6 +5,10 @@ from functools import wraps
 from utils import registration_verify_user, registration_add_user
 
 
+
+# _________________________________ PLACEHOLDER _________________________________#
+
+
 def get_user_active_contracts(username):
     """
         get user active contracts
@@ -51,7 +55,7 @@ def get_user_state(username):
         return '3'
 
 
-def authorize(f):
+def authorize_user(f):
     """
     Token verification Decorator. This decorator validate the token passed in the header with the endpoint.
     *Returns:*
@@ -85,3 +89,8 @@ def authorize(f):
         return f(authorized_username=user['username'], *args, **kwargs)
 
     return decorated
+
+
+# _________________________________ Upload requests handler _________________________________#
+
+
