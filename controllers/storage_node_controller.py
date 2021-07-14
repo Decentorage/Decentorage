@@ -60,4 +60,11 @@ def get_availability(authorized_username):
 
 
 def test_contract():
+    pay_limit = request.args.get("pay_limit")
+    contract_address = request.args.get("contract_address")
+    storage_address = request.args.get("storage_address")
+    if pay_limit and contract_address and storage_address:
+        return test_contract_handler(pay_limit, contract_address, storage_address)
+    else:
+        return make_response("missing parameters", 400)
     return test_contract_handler()
