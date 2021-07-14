@@ -1,19 +1,15 @@
 import datetime
 import math
 import app
-<<<<<<< HEAD
 import web3_library
 import os
 #_________________________________ Check database functions _________________________________#
-=======
 from functools import wraps
 from flask import abort, request
 import jwt
 from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
 
-
->>>>>>> 58f2badde2b0b223fd654d3936ea8415e7bb3573
 def get_storage_nodes_collection():
     if app.database:
         return app.database["storage_nodes"]
