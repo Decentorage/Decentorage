@@ -17,11 +17,11 @@ def get_storage_nodes_collection():
         return app.database["storage_nodes"]
     else:
         return False
-
 # _________________________________ Heartbeat handler functions _________________________________#
 
+
 # How many minutes between each heartbeat
-intraheartbeat_minutes = Configuration.intraheartbeat_minutes
+interheartbeat_minutes = Configuration.interheartbeat_minutes
 resetting_months = Configuration.resetting_months
 decentorage_epoch = Configuration.decentorage_epoch
 # 
@@ -61,7 +61,7 @@ def heartbeat_handler(authorized_username):
         months_since_epoch = now.month - decentorage_epoch.month
         last_interval_start_datetime = get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch)
         next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
-        new_last_heartbeat = now - datetime.timedelta(minutes=now.minute % intraheartbeat_minutes - intraheartbeat_minutes,
+        new_last_heartbeat = now - datetime.timedelta(minutes=now.minute % interheartbeat_minutes - interheartbeat_minutes,
                                                       seconds=now.second, microseconds=now.microsecond)
         if new_last_heartbeat >= next_interval_start_datetime: # if new heartbeat is in new interval, flag new last heartbeat = -2
             new_last_heartbeat = -2
@@ -157,10 +157,10 @@ def get_availability(storage_node):
     availability = get_percentage(heartbeats, full_availability_heartbeats)
     if last_heartbeat == -2: # transition state
         # First slot in new interval
-        if now - last_interval_start_datetime <= datetime.timedelta(minutes=intraheartbeat_minutes):
+        if now - last_interval_start_datetime <= datetime.timedelta(minutes=interheartbeat_minutes):
             return 100
         # Last slot in old interval
-        elif next_interval_start_datetime - now <= datetime.timedelta(minutes=intraheartbeat_minutes):
+        elif next_interval_start_datetime - now <= datetime.timedelta(minutes=interheartbeat_minutes):
             return availability
         # new interval but not first slot
         else:
