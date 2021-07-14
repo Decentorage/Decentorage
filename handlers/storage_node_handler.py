@@ -171,7 +171,22 @@ def get_availability(storage_node):
         return availability
 
 
-def withdraw_handler(authorized_username):
+def get_contract_address_from_storage_node(active_contracts, shard_id):
+    for active in active_contracts:
+        if active["shard_id"] == shard_id:
+            return active["contract_address"]
+
+
+def storage_node_address_with_contract_nodes(contract, storage_address):
+    contract_storage_nodes = web3_library.get_storage_nodes(contract)
+    for address in contract_storage_nodes:
+        if address == storage_address:
+            return True
+    return False
+
+
+# TODO: the function not tested yet should be tested later
+def withdraw_handler(authorized_username, shard_id):
     storage_nodes  = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
@@ -180,23 +195,16 @@ def withdraw_handler(authorized_username):
     # secret_key = os.environ["m"]
     if storage_node:
         availability = get_availability(storage_node)   # Availability in percentage [0, 100].
-        # TODO: write withdrawing functions
-        if availability > Configuration.minimum_availability:
-            # address = get_contract_address(storage)
-            # contract = get_contract(address)
-            contract = web3_library.get_contract()
-            # nonce = web3_library.w3.eth.getTransactionCount(web3_library.w3.eth.defaultAccount)
-            # transaction = contract.functions.payStorageNode('0xa493E9A2447F8C5732696673b6B2339B592d0eb9').buildTransaction({
-            #     'gas': 70000,
-            #     'gasPrice': web3_library.w3.toWei('1', 'gwei'),
-            #     'from': web3_library.w3.eth.defaultAccount,
-            #     'nonce': nonce
-            # })
-            # signed_txn = web3_library.w3.eth.account.signTransaction(transaction, private_key=web3_library.private_key)
-            # tx_hash = web3_library.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
-            # tx_receipt = web3_library.w3.eth.waitForTransactionReceipt(tx_hash)
-            # return str(tx_receipt) + str(tx_hash) + str(contract.address)
-            return str(contract.functions.getStorageNodes().call())
+        # TODO: calculate payment based on availability
+        payment = availability
+        storage_wallet_address = storage_node["wallet_address"]
+        active_contracts = storage_node["active_contracts"]
+        contract_address = get_contract_address_from_storage_node(active_contracts, shard_id)
+        contract = web3_library.get_contract(contract_address)
+        in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
+        # TODO: check for payment date before transfer the money
+        if availability > Configuration.minimum_availability and in_contract:
+            web3_library.pay_storage_node(contract, storage_wallet_address, payment)
         else:
             return "availability is not good enough"
     else:
@@ -214,6 +222,65 @@ def get_availability_handler(authorized_username):
     return flask.Response(status=200,response=str(availability))
 
 
-def test_contract_handler():
-    # TODO: SOME TESTS FOR THE CONTRACT FUNCTIONALITY
-    return "done"
+def test_contract_handler(pay_limit, contract_address, storage_address):
+    return "this is test contract handler"
+    # create new contract
+    # contract = web3_library.create_contract(pay_limit)
+    # return flask.Response(status=200, response="contract address: " + str(contract.address) + '\ndecentorage address: ' + str(web3_library.get_decentorage(contract)))
+
+    # get an existing contract
+    # contract = web3_library.get_contract(contract_address)
+    # return flask.Response(status=200, response="contract address: " + str(contract.address))
+
+    # add new node
+    # contract = web3_library.get_contract(contract_address)
+    # web3_library.add_node(contract, storage_address)
+    # storage_nodes = web3_library.get_storage_nodes(contract)
+    # return flask.Response(status=200, response="storage node address: " + str(storage_nodes[0]))
+
+    # delete node contract = web3_library.get_contract(contract_address) before = web3_library.get_storage_nodes(
+    # contract) web3_library.delete_node(contract, storage_address) after = web3_library.get_storage_nodes(contract)
+    # return flask.Response(status=200, response="storage nodes count before: " + str(len(before)) + '\n' + "storage
+    # nodes count after: " + str(len(after)))
+
+    # swap node
+    # contract = web3_library.get_contract(contract_address)
+    # web3_library.add_node(contract, storage_address)
+    # before = web3_library.get_storage_nodes(contract)
+    # web3_library.swap_nodes(contract, storage_address, 0)
+    # after = web3_library.get_storage_nodes(contract)
+    # return flask.Response(status=200, response="storage nodes count before: " + str(
+    #     len(before)) + '\n' + "storage nodes count after: " + str(len(after)))
+
+    # pay storage node
+    # contract = web3_library.get_contract(contract_address)
+    # balance_before = web3_library.get_balance(contract)
+    # web3_library.user_pay(contract)
+    # balance_after = web3_library.get_balance(contract)
+    # return flask.Response(status=200, response="contract balance before = " + str(balance_before) + "\ncontract balance before = " + str(balance_after))
+
+    # user address
+    # contract = web3_library.get_contract(contract_address)
+    # address = web3_library.get_web_user(contract)
+    # return flask.Response(status=200, response="web user address = " + address)
+
+    # decentorage address
+    # contract = web3_library.get_contract(contract_address)
+    # address = web3_library.get_decentorage(contract)
+    # return flask.Response(status=200, response="decentorage address = " + address)
+
+    # pay storage node
+    # contract = web3_library.get_contract(contract_address)
+    # balance_before = web3_library.get_balance(contract)
+    # web3_library.pay_storage_node(contract, storage_address, 100)
+    # balance_after = web3_library.get_balance(contract)
+    # return flask.Response(status=200, response="contract balance before = " + str(
+    #     balance_before) + "\ncontract balance before = " + str(balance_after))
+
+    # terminate contract
+    # contract = web3_library.get_contract(contract_address)
+    # balance_before = web3_library.get_balance(contract)
+    # web3_library.terminate(contract)
+    # balance_after = web3_library.get_balance(contract)
+    # return flask.Response(status=200, response="contract balance before = " + str(
+    #     balance_before) + "\ncontract balance before = " + str(balance_after))

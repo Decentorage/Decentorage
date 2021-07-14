@@ -2,10 +2,13 @@ from flask import Flask
 import pymongo
 import config
 from routes import add_storage_urls, add_user_urls
+from cryptography.fernet import Fernet
+
 #####################################
 app = Flask(__name__)
 database = None
 secret_key = None
+fernet = None
 
 
 def initialize(env):
@@ -30,7 +33,7 @@ def initialize(env):
 
 
 def run(env):
-    global database, secret_key
+    global database, secret_key, fernet
     """
             Attempts to initialize the app, and runs it if the initialization was successful.
     """
@@ -41,6 +44,8 @@ def run(env):
         client = pymongo.MongoClient(database_uri)
         database = client[database_name]
         secret_key = app.config['SECRET_KEY']
+        shard_id_key = str.encode(app.config['SHARD_ID_KEY'])
+        fernet = Fernet(shard_id_key)
         # Add routes
         add_storage_urls()
         add_user_urls()

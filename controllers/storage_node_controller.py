@@ -50,7 +50,11 @@ def test(authorized_username):
 
 @authorize_storage
 def withdraw(authorized_username):
-    return withdraw_handler(authorized_username)
+    shard_id = request.json["shard_id"]
+    if shard_id:
+        return withdraw_handler(authorized_username, shard_id)
+    else:
+        return "shard id is missing from request body"
 
 
 @authorize_storage
@@ -59,4 +63,11 @@ def get_availability(authorized_username):
 
 
 def test_contract():
+    pay_limit = request.args.get("pay_limit")
+    contract_address = request.args.get("contract_address")
+    storage_address = request.args.get("storage_address")
+    if pay_limit and contract_address and storage_address:
+        return test_contract_handler(pay_limit, contract_address, storage_address)
+    else:
+        return make_response("missing parameters", 400)
     return test_contract_handler()

@@ -12,6 +12,7 @@ class BaseConfig:
     MAIL_USERNAME = 'no-reply@decentorage.tech'
     MAIL_PASSWORD = ''
     FRONT_END_ROOT = 'http://www.decentorage.tech'
+    SHARD_ID_KEY = os.environ["SHARD_ID_KEY"]
 
 
 class DevelopmentConfig(BaseConfig):

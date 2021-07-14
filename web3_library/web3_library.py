@@ -1,5 +1,6 @@
 import json
 from web3 import Web3
+from web3.middleware import geth_poa_middleware
 import os
 
 infura_url = os.environ["INFURA_URL"]
@@ -9,25 +10,25 @@ bytecode = os.environ["BYTECODE"]
 private_key = os.environ["PRIVATE_KEY"]
 
 w3 = Web3(Web3.HTTPProvider(infura_url))
+w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 w3.eth.defaultAccount = address
 
 
-# TODO: this address should be sent to the function or got from the database
-def get_contract(contract_address="0x9Db8B2e2bac516CE88b27cF6A3A7a53161AE3eBf"):
+def get_contract(contract_address):
     pay_contract = w3.eth.contract(address=contract_address, abi=abi)
-    print(pay_contract)
     return pay_contract
 
 
 def create_contract(payment_limit = 499):
     pay_contract_to_deploy = w3.eth.contract(abi=abi, bytecode=bytecode)
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = pay_contract_to_deploy.constructor(payment_limit).buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = pay_contract_to_deploy.constructor(int(payment_limit)).buildTransaction({
+        'gas': 10000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
+    # tx_hash = pay_contract_to_deploy.constructor(int(payment_limit)).transact()
     signed_txn = w3.eth.account.signTransaction(transaction, private_key=private_key)
     tx_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
     tx_receipt = w3.eth.waitForTransactionReceipt(tx_hash)
@@ -41,9 +42,9 @@ def create_contract(payment_limit = 499):
 
 def pay_storage_node(contract, storage_address, payment):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.payStorageNode(storage_address, payment).buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.payStorageNode(storage_address, payment).buildTransaction({
+        'gas': 1000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -52,12 +53,12 @@ def pay_storage_node(contract, storage_address, payment):
     w3.eth.waitForTransactionReceipt(tx_hash)
 
 
-def add_node(contract, storage_address, payment_date):
+def add_node(contract, storage_address):
     # add storage node
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.addStorageNode(storage_address).buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.addStorageNode(storage_address).buildTransaction({
+        'gas': 1000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -70,9 +71,9 @@ def add_node(contract, storage_address, payment_date):
 
 def delete_node(contract, storage_address):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.deleteStorageNode(storage_address).buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.deleteStorageNode(storage_address).buildTransaction({
+        'gas': 1000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -85,9 +86,9 @@ def delete_node(contract, storage_address):
 
 def swap_nodes(contract, storage_address, index):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.swapStorageNode(storage_address, index).buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.swapStorageNode(storage_address, index).buildTransaction({
+        'gas': 1000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -99,9 +100,9 @@ def swap_nodes(contract, storage_address, index):
 
 def terminate(contract):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.terminate().buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.terminate().buildTransaction({
+        'gas': 1000000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -127,12 +128,12 @@ def get_decentorage(contract):
     return contract.functions.getDecentorage().call()
 
 
-# this fucntion for testing, it is not gonna be used in backend
+# this function for testing, it is not gonna be used in backend
 def user_pay(contract):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.userPay().buildTransaction({
-        'gas': 70000,
-        'gasPrice': w3.toWei('1', 'gwei'),
+    transaction = contract.functions.userPay().buildTransaction({
+        'gas': 100000,
+        'gasPrice': w3.toWei('60', 'gwei'),
         'from': w3.eth.defaultAccount,
         'value': 500,
         'nonce': nonce

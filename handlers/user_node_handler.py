@@ -1,3 +1,4 @@
+from pymongo.common import validate_positive_integer_or_none
 import app
 import jwt
 from flask import abort, request
@@ -90,4 +91,59 @@ def authorize_user(f):
 
 # _________________________________ Upload requests handler _________________________________#
 
+
+def create_file_handler(authorized_username, new_file):
+    if not all (parameter in new_file for parameter in ("segments","segments_count","download_counts","file_size","filename","download_counts","duration_in_months")):
+        return abort(400, "Invalid json object")
+    new_file_segments = new_file["segments"]
+    for segment in new_file_segments:
+        if not all (parameter in segment for parameter in ("k","m","shard_size")):
+            return abort(400, "Invalid json object")
+    filename = new_file["filename"]
+    
+    # TODO create empty contract
+    files = app.database["files"]
+    if not files:
+        return abort(500, "Database error.")
+    query = {
+        "filename":new_file["filename"],
+        "segments_count":new_file["segments_count"],
+        "file_size":new_file["file_size"],
+        "download_counts":new_file["download_counts"],
+        "duration_in_months":new_file["duration_in_months"],
+        "contract":"",
+        "username": authorized_username,
+        "done_uploading":False
+        }
+    _id = files.insert_one(query).inserted_id
+    segments_list = []
+    for segment_no, segment in enumerate(new_file_segments):
+        # k and m values should be checked for violations
+        total_shards = segment["k"] + segment["m"]
+        shard_list = []
+        for i in range(total_shards):
+            shard_id = _id + "$DCNTRG$" + segment_no + "$DCNTRG$" + i
+            shard_id = app.fernet.encrypt(shard_id)
+            shard_list.append(
+                {
+                    "shard_id":shard_id,
+                    "shard_node_username":"",
+                    "done_uploading":False
+                }
+            )
+        segments_list.append({
+            "k":segment["k"],
+            "m":segment["m"],
+            "shard_size":segment["shard_size"],
+            "shards":shard_list
+        })
+    query = { "_id": _id }
+    newvalues = { "$set": { "segments": segments_list } }
+    files.update_one(query, newvalues)
+    
+
+    
+    
+
+    
 
