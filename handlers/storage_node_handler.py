@@ -171,7 +171,22 @@ def get_availability(storage_node):
         return availability
 
 
-def withdraw_handler(authorized_username):
+def get_contract_address_from_storage_node(active_contracts, shard_id):
+    for active in active_contracts:
+        if active["shard_id"] == shard_id:
+            return active["contract_address"]
+
+
+def storage_node_address_with_contract_nodes(contract, storage_address):
+    contract_storage_nodes = web3_library.get_storage_nodes(contract)
+    for address in contract_storage_nodes:
+        if address == storage_address:
+            return True
+    return False
+
+
+# TODO: the function not tested yet should be tested later
+def withdraw_handler(authorized_username, shard_id):
     storage_nodes  = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
@@ -180,23 +195,16 @@ def withdraw_handler(authorized_username):
     # secret_key = os.environ["m"]
     if storage_node:
         availability = get_availability(storage_node)   # Availability in percentage [0, 100].
-        # TODO: write withdrawing functions
-        if availability > Configuration.minimum_availability:
-            # address = get_contract_address(storage)
-            # contract = get_contract(address)
-            contract = web3_library.get_contract()
-            # nonce = web3_library.w3.eth.getTransactionCount(web3_library.w3.eth.defaultAccount)
-            # transaction = contract.functions.payStorageNode('0xa493E9A2447F8C5732696673b6B2339B592d0eb9').buildTransaction({
-            #     'gas': 70000,
-            #     'gasPrice': web3_library.w3.toWei('1', 'gwei'),
-            #     'from': web3_library.w3.eth.defaultAccount,
-            #     'nonce': nonce
-            # })
-            # signed_txn = web3_library.w3.eth.account.signTransaction(transaction, private_key=web3_library.private_key)
-            # tx_hash = web3_library.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
-            # tx_receipt = web3_library.w3.eth.waitForTransactionReceipt(tx_hash)
-            # return str(tx_receipt) + str(tx_hash) + str(contract.address)
-            return str(contract.functions.getStorageNodes().call())
+        # TODO: calculate payment based on availability
+        payment = availability
+        storage_wallet_address = storage_node["wallet_address"]
+        active_contracts = storage_node["active_contracts"]
+        contract_address = get_contract_address_from_storage_node(active_contracts, shard_id)
+        contract = web3_library.get_contract(contract_address)
+        in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
+        # TODO: check for payment date before transfer the money
+        if availability > Configuration.minimum_availability and in_contract:
+            web3_library.pay_storage_node(contract, storage_wallet_address, payment)
         else:
             return "availability is not good enough"
     else:

@@ -51,7 +51,11 @@ def test(authorized_username):
 
 @authorize_storage
 def withdraw(authorized_username):
-    return withdraw_handler(authorized_username)
+    shard_id = request.json["shard_id"]
+    if shard_id:
+        return withdraw_handler(authorized_username, shard_id)
+    else:
+        return "shard id is missing from request body"
 
 
 @authorize_storage
