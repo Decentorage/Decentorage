@@ -1,5 +1,5 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state
+from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state, create_file_handler
 from utils import create_token
 
 
@@ -49,6 +49,13 @@ def get_state(authorized_username):
 def get_active_contracts(authorized_username):
     files = get_user_active_contracts(authorized_username)
     return make_response(jsonify(files), 200)
+
+
+@authorize_user
+def create_file(authorized_username):
+    if get_user_state(authorized_username) != '2':
+        return make_response("No contract requests available.", 403)
+    return create_file_handler(authorized_username, request.json)
 
 
 @authorize_user
