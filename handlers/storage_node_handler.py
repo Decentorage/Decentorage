@@ -213,3 +213,7 @@ def get_availability_handler(authorized_username):
     print(availability)
     return flask.Response(status=200,response=str(availability))
 
+
+def test_contract_handler():
+    # TODO: SOME TESTS FOR THE CONTRACT FUNCTIONALITY
+    return "done"

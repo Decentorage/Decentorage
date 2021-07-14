@@ -1,5 +1,5 @@
 from flask import make_response, jsonify
-from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler, get_availability_handler
+from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler, get_availability_handler, test_contract_handler
 from utils import create_token
 from flask import request
 
@@ -57,3 +57,7 @@ def withdraw(authorized_username):
 @authorize_storage
 def get_availability(authorized_username):
     return get_availability_handler(authorized_username)
+
+
+def test_contract():
+    return test_contract_handler()
