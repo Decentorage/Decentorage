@@ -3,12 +3,14 @@ import math
 
 import flask
 import app
+import web3_library
+import os
+#_________________________________ Check database functions _________________________________#
 from functools import wraps
 from flask import abort, request
 import jwt
 from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
-
 
 def get_storage_nodes_collection():
     if app.database:
@@ -175,11 +177,28 @@ def withdraw_handler(authorized_username):
         abort(500, 'Database server error.')
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
+    # secret_key = os.environ["m"]
     if storage_node:
         availability = get_availability(storage_node)   # Availability in percentage [0, 100].
         # TODO: write withdrawing functions
         if availability > Configuration.minimum_availability:
-            pass
+            # address = get_contract_address(storage)
+            # contract = get_contract(address)
+            contract = web3_library.get_contract()
+            # nonce = web3_library.w3.eth.getTransactionCount(web3_library.w3.eth.defaultAccount)
+            # transaction = contract.functions.payStorageNode('0xa493E9A2447F8C5732696673b6B2339B592d0eb9').buildTransaction({
+            #     'gas': 70000,
+            #     'gasPrice': web3_library.w3.toWei('1', 'gwei'),
+            #     'from': web3_library.w3.eth.defaultAccount,
+            #     'nonce': nonce
+            # })
+            # signed_txn = web3_library.w3.eth.account.signTransaction(transaction, private_key=web3_library.private_key)
+            # tx_hash = web3_library.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
+            # tx_receipt = web3_library.w3.eth.waitForTransactionReceipt(tx_hash)
+            # return str(tx_receipt) + str(tx_hash) + str(contract.address)
+            return str(contract.functions.getStorageNodes().call())
+        else:
+            return "availability is not good enough"
     else:
         return "Database error."
 
