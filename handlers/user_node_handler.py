@@ -5,10 +5,7 @@ from functools import wraps
 from utils import registration_verify_user, registration_add_user
 
 
-
 # _________________________________ PLACEHOLDER _________________________________#
-
-
 def get_user_active_contracts(username):
     """
         get user active contracts

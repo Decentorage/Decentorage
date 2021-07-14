@@ -30,7 +30,7 @@ def initialize(env):
 
 
 def run(env):
-    global database, code, secret_key
+    global database, secret_key
     """
             Attempts to initialize the app, and runs it if the initialization was successful.
     """

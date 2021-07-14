@@ -4,7 +4,6 @@ from utils import create_token
 from flask import request
 
 
-
 @authorize_storage
 def heartbeat(authorized_username):
     return heartbeat_handler(authorized_username)
