@@ -154,7 +154,7 @@ def create_file_handler(authorized_username, new_file):
     new_values = {"$set": {"segments": segments_list}}
     files.update_one(query, new_values)
     query = {'username': authorized_username}
-    new_values = {"$set": {"request": True}}
+    new_values = {"$set": {"request": True}, "$inc": {"available_request_count": -1}}
     users.update_one(query, new_values)
     return True
 
