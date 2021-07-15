@@ -8,10 +8,9 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/getFiles", view_func=get_active_contracts, methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getState", view_func=get_state, methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getPrice", view_func=get_price, methods=["GET"])
+    app.app.add_url_rule(user_url_prefix + "/getFileInfo", view_func=get_file_info, methods=["GET"])
 
     # Post Methods
     app.app.add_url_rule(user_url_prefix + "/signup", view_func=user_signup, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/signin", view_func=user_signin, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/createFile", view_func=create_file, methods=["POST"])
-    app.app.add_url_rule(user_url_prefix + "/getFileInfo", view_func=get_file_info, methods=["POST"])
-

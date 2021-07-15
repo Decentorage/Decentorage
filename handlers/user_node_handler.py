@@ -163,10 +163,10 @@ def get_file_info_handler(authorized_username):
     if not files:
         abort(500, "Database error.")
 
-    query = {"username":authorized_username, "uploading_done":False}    
+    query = {"username": authorized_username, "done_uploading": False}
     file = files.find_one(query)
     if not file:
         abort(404, "There is no file being uploaded.")
     
-    response = {"file_size":file["file_size"], "segments":file["segments"]}
-    return make_response(jsonify(response),200)
+    response = {"file_size":file["file_size"], "segments": file["segments"]}
+    return make_response(jsonify(response), 200)
