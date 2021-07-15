@@ -15,6 +15,8 @@ def storage_signup():
         username = request.json["username"]
         password = request.json["password"]
         wallet_address = request.json["wallet_address"]
+        if not re.match("^0x[a-fA-F0-9]{40}$", wallet_address):
+            return make_response("Invalid Wallet Address.", 422)
         if username and password and wallet_address:
             username_already_exists = add_storage(username, password, wallet_address)
             if username_already_exists:
