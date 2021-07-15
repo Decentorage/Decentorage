@@ -66,4 +66,10 @@ def create_file(authorized_username):
 @authorize_user
 def get_price():
     # TODO: Implement proper price equation.
-    return random.randint(0, 1000)
+    download_count = request.json["download_count"]
+    duration_in_months = request.json["duration_in_months"]
+    file_size = request.json["file_size"]
+    price_per_storage = file_size / 1099511627776
+    price_per_download = price_per_storage * 1.8
+    admin_fees = 0.01 * price_per_storage
+    return admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
