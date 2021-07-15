@@ -5,6 +5,7 @@ import jwt
 from flask import abort, request
 from functools import wraps
 from utils import registration_verify_user, registration_add_user
+import random
 
 
 # _________________________________ PLACEHOLDER _________________________________#
@@ -123,13 +124,14 @@ def create_file_handler(authorized_username, new_file):
         "duration_in_months": new_file["duration_in_months"],
         "contract": "",
         "username": authorized_username,
-        "done_uploading": False
+        "done_uploading": False,
+        "paid": False
         }
     _id = files.insert_one(query).inserted_id
     segments_list = []
     for segment_no, segment in enumerate(new_file_segments):
         # k and m values should be checked for violations
-        total_shards = segment["k"] + segment["m"]
+        total_shards =  segment["m"]
         shard_list = []
         for i in range(total_shards):
             shard_id = str(_id) + "$DCNTRG$" + str(segment_no) + "$DCNTRG$" + str(i)
@@ -170,3 +172,81 @@ def get_file_info_handler(authorized_username):
     
     response = {"file_size":file["file_size"], "segments":file["segments"]}
     return make_response(jsonify(response),200)
+
+
+def pay_contract_handler(authorized_username):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+
+    query = {"username":authorized_username, "uploading_done":False, "paid": False}    
+    file = files.find_one(query)
+    if not file:
+        abort(404, "There is no unpaid file being uploaded.")
+    
+    # TODO check for contract paid
+    contract = file["contract"]
+    # Assuming payment successful
+    paid = True
+    if not paid:
+        abort(403, "Contract is not paid yet.")
+    
+    storage_nodes = app.database["storage_nodes"]
+    segments = file["segments"]
+    
+    for i, segment in enumerate(segments):
+        total_shards = segment["m"]
+        unassigned_shards = total_shards
+        shard_size = segment["shard_size"]
+        query = {"available_space": {"$gt": shard_size}}
+
+        while unassigned_shards > 0:
+            possible_storage_nodes = storage_nodes.find(query)
+            possible_storage_nodes_count = possible_storage_nodes.count_documents()
+            
+            if possible_storage_nodes_count == 0:
+                abort(500, "No storage nodes available")
+
+            unordered_possible_storage_nodes_indices = random.shuffle(list(range(0, possible_storage_nodes_count - 1)))
+            unused_possible_storage_nodes_indices = unordered_possible_storage_nodes_indices[unassigned_shards:]
+            size_unused = len(unused_possible_storage_nodes_indices)
+            index_unused = 0
+            del unordered_possible_storage_nodes_indices[unassigned_shards:]
+            for j, index in enumerate(unordered_possible_storage_nodes_indices):
+                # TODO inform storage node and get port
+                port = "4500"
+                fail = False
+                if fail:
+                    if index_unused < size_unused:
+                        unordered_possible_storage_nodes_indices[j], unused_possible_storage_nodes_indices[index_unused], index = \
+                            unused_possible_storage_nodes_indices[index_unused], unordered_possible_storage_nodes_indices[j],\
+                                 unused_possible_storage_nodes_indices[index_unused]
+                    else:
+                        continue
+                # Storage node update
+                shard_id =  segments[i]["shards"][unassigned_shards-1]["shard_id"]
+                current_storage_node = possible_storage_nodes[index]
+                storage_node_username = current_storage_node["username"]
+                ip_address = current_storage_node["ip_address"]
+                new_available_space = current_storage_node["available_space"] - shard_size
+                new_contracts_entry = {'active_contracts': {"shard_id":shard_id, "contract_address": contract}}
+                query = {"username":storage_node_username}
+                new_values = {"$set": { "available_space": new_available_space},"$push": new_contracts_entry}
+                storage_nodes.update_one(query, new_values)
+                # File update
+                segments[i]["shards"][unassigned_shards-1]["ip_address"] = ip_address
+                segments[i]["shards"][unassigned_shards-1]["port"] = port
+                segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
+                unassigned_shards -= 1
+    query = {"username": authorized_username }
+    new_values = { "$set": { "segments": segments } }
+    files.update_one(query, new_values)
+    return make_response("Contract payment successful", 200)
+
+
+
+        
+
+
+
+
