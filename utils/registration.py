@@ -31,7 +31,7 @@ def registration_add_user(username, password, user_type, extra_info=None):
                               'active_contracts': [], 'available_request_count': 0})
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
-                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'],
+                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'], "available_space": extra_info["available_space"],
                               'active_contracts': []})
         return False
     except:

@@ -86,8 +86,8 @@ def heartbeat_handler(authorized_username):
 # _________________________________ Registrations _________________________________#
 
 
-def add_storage(username, password, wallet_address):
-    extra_info = {'wallet_address': wallet_address}
+def add_storage(username, password, wallet_address, available_space):
+    extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
     print(extra_info)
     return registration_add_user(username, password, "storage", extra_info)
 
