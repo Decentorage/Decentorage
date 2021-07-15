@@ -3,7 +3,7 @@ from handlers import add_user, verify_user, authorize_user, get_user_active_cont
     create_file_handler, get_file_info_handler, pay_contract_handler
 from utils import create_token
 import json
-import random
+import os
 
 
 # __________________________ Unauthorized requests __________________ #
@@ -84,3 +84,6 @@ def get_file_info(authorized_username):
 def pay_contract(authorized_username):
     return pay_contract_handler(authorized_username)
 
+@authorize_user
+def get_decentorage_wallet_address(authorized_username):
+    return make_response(jsonify({'decentorage_wallet_address': os.environ["ADDRESS"]}), 200)
