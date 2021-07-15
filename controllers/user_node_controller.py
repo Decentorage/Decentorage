@@ -1,5 +1,6 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state, create_file_handler
+from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
+    create_file_handler
 from utils import create_token
 import json
 

@@ -17,7 +17,7 @@ def registration_add_user(username, password, user_type):
     """
     try:
         if user_type == "user":
-            users = app.database["user"]
+            users = app.database["user_nodes"]
         else:
             users = app.database["storage_nodes"]
         query = {"username": username}
@@ -50,7 +50,7 @@ def registration_verify_user(username, password, user_type):
     """
     try:
         if user_type == "user":
-            users = app.database["user"]
+            users = app.database["user_nodes"]
         else:
             users = app.database["storage_nodes"]
         query = {"username": username}

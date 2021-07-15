@@ -15,7 +15,7 @@ def get_user_active_contracts(username):
            - List of active contracts of a specific user.
     """
     try:
-        users = app.database["user"]
+        users = app.database["user_nodes"]
         query = {"username": username}
         user = users.find_one(query)
         if user['active_contracts']:
@@ -36,7 +36,7 @@ def verify_user(username, password):
 
 def get_user_state(username):
     try:
-        users = app.database["user"]
+        users = app.database["user_nodes"]
         query = {"username": username}
         user = users.find_one(query)
         # State 1: there is a pending contract instance
@@ -103,8 +103,8 @@ def create_file_handler(authorized_username, new_file):
 
     # TODO create empty contract
     files = app.database["files"]
-    users = app.database["user"]
-    if not files:
+    users = app.database["user_nodes"]
+    if not files or not users:
         abort(500, "Database error.")
     query = {
         'username': authorized_username,
@@ -147,13 +147,9 @@ def create_file_handler(authorized_username, new_file):
             "shards": shard_list
         })
     query = {"_id": _id}
-    newvalues = {"$set": {"segments": segments_list}}
-    files.update_one(query, newvalues)
+    new_values = {"$set": {"segments": segments_list}}
+    files.update_one(query, new_values)
+    query = {'username': authorized_username}
+    new_values = {"$set": {"request": True}}
+    users.update_one(query, new_values)
     return True
-    
-
-    
-    
-
-    
-
