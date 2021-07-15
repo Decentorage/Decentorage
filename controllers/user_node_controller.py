@@ -64,12 +64,12 @@ def create_file(authorized_username):
 
 
 @authorize_user
-def get_price():
-    # TODO: Implement proper price equation.
-    download_count = request.json["download_count"]
-    duration_in_months = request.json["duration_in_months"]
-    file_size = request.json["file_size"]
+def get_price(authorized_username):
+    download_count = int(request.args.get("download_count"))
+    duration_in_months = int(request.args.get("duration_in_months"))
+    file_size = int(request.args.get("file_size"))
     price_per_storage = file_size / 1099511627776
     price_per_download = price_per_storage * 1.8
     admin_fees = 0.01 * price_per_storage
-    return admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    return make_response(jsonify({'price': price}), 200)
