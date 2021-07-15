@@ -72,4 +72,6 @@ def get_price(authorized_username):
     price_per_download = price_per_storage * 1.8
     admin_fees = 0.01 * price_per_storage
     price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    if price < 0.25:
+        price = 0.25
     return make_response(jsonify({'price': price}), 200)
