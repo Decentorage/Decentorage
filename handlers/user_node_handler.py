@@ -1,3 +1,5 @@
+from flask.helpers import make_response
+from flask.json import jsonify
 import app
 import jwt
 from flask import abort, request
@@ -153,3 +155,18 @@ def create_file_handler(authorized_username, new_file):
     new_values = {"$set": {"request": True}}
     users.update_one(query, new_values)
     return True
+
+
+def get_file_info_handler(authorized_username):
+    
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+
+    query = {"username":authorized_username, "uploading_done":False}    
+    file = files.find_one(query)
+    if not file:
+        abort(404, "There is no file being uploaded.")
+    
+    response = {"file_size":file["file_size"], "segments":file["segments"]}
+    return make_response(jsonify(response),200)

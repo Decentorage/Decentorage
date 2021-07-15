@@ -1,4 +1,4 @@
-from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price
+from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price, get_file_info
 import app
 user_url_prefix = '/user'
 
@@ -13,3 +13,5 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/signup", view_func=user_signup, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/signin", view_func=user_signin, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/createFile", view_func=create_file, methods=["POST"])
+    app.app.add_url_rule(user_url_prefix + "/getFileInfo", view_func=get_file_info, methods=["POST"])
+
