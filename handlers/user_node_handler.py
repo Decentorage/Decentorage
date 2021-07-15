@@ -6,6 +6,7 @@ from flask import abort, request
 from functools import wraps
 from utils import registration_verify_user, registration_add_user
 import random
+import string
 
 
 # _________________________________ PLACEHOLDER _________________________________#
@@ -42,17 +43,20 @@ def get_user_state(username):
         users = app.database["user_nodes"]
         query = {"username": username}
         user = users.find_one(query)
-        # State 1: there is a pending contract instance
-        if user['request']:
+        # State 1: there is a pending contract paid
+        if user['pending_contract_paid']:
             return '1'
-        # State 2: no pending contract instance and there is money to initiate request
-        elif user['available_request_count'] > 0:
+        # State 2: there is a pending contract but not paid
+        elif user['pending_contract']:
             return '2'
-        # State 3: no pending contract instance and no money to initiate request
-        else:
+        # State 3: no pending contract instance and there is seeds
+        elif user['seeds'] > 0:
             return '3'
+        # State 4: no pending contract instance and no seeds
+        else:
+            return '4'
     except:
-        return '3'
+        return '4'
 
 
 def authorize_user(f):
@@ -154,7 +158,7 @@ def create_file_handler(authorized_username, new_file):
     new_values = {"$set": {"segments": segments_list}}
     files.update_one(query, new_values)
     query = {'username': authorized_username}
-    new_values = {"$set": {"request": True}, "$inc": {"available_request_count": -1}}
+    new_values = {"$set": {"pending_contract": True}, "$inc": {"seeds": -1}}
     users.update_one(query, new_values)
     return True
 
@@ -178,12 +182,12 @@ def pay_contract_handler(authorized_username):
     if not files:
         abort(500, "Database error.")
 
-    query = {"username":authorized_username, "uploading_done":False, "paid": False}    
+    query = {"username":authorized_username, "done_uploading": False, "paid": False}
     file = files.find_one(query)
     if not file:
         abort(404, "There is no unpaid file being uploaded.")
     
-    # TODO check for contract paid
+    # TODO check if contract is paid
     contract = file["contract"]
     # Assuming payment successful
     paid = True
@@ -197,23 +201,23 @@ def pay_contract_handler(authorized_username):
         total_shards = segment["m"]
         unassigned_shards = total_shards
         shard_size = segment["shard_size"]
-        query = {"available_space": {"$gt": shard_size}}
-
-        while unassigned_shards > 0:
-            possible_storage_nodes = storage_nodes.find(query)
-            possible_storage_nodes_count = possible_storage_nodes.count_documents()
+        available_space_query = {"available_space": {"$gt": shard_size}}
+        retry_count = 10
+        while unassigned_shards > 0 and retry_count > 0:
+            possible_storage_nodes = storage_nodes.find(available_space_query)
+            possible_storage_nodes_count = storage_nodes.count_documents(available_space_query)
             
             if possible_storage_nodes_count == 0:
                 abort(500, "No storage nodes available")
 
-            unordered_possible_storage_nodes_indices = random.shuffle(list(range(0, possible_storage_nodes_count - 1)))
+            unordered_possible_storage_nodes_indices = list(range(0, possible_storage_nodes_count))
+            random.shuffle(unordered_possible_storage_nodes_indices)
             unused_possible_storage_nodes_indices = unordered_possible_storage_nodes_indices[unassigned_shards:]
             size_unused = len(unused_possible_storage_nodes_indices)
             index_unused = 0
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
             for j, index in enumerate(unordered_possible_storage_nodes_indices):
-                # TODO inform storage node and get port
-                port = "4500"
+                # TODO check if node is alive
                 fail = False
                 if fail:
                     if index_unused < size_unused:
@@ -222,11 +226,15 @@ def pay_contract_handler(authorized_username):
                                  unused_possible_storage_nodes_indices[index_unused]
                     else:
                         continue
+                # Shared authentication key for communication
+                shared_authentication_key = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+                # TODO send authentication key, inform storage node, and get port
+                port = "4500"
                 # Storage node update
                 shard_id =  segments[i]["shards"][unassigned_shards-1]["shard_id"]
                 current_storage_node = possible_storage_nodes[index]
                 storage_node_username = current_storage_node["username"]
-                ip_address = current_storage_node["ip_address"]
+                ip_address = "12.12.12.12"                   # TODO: current_storage_node["ip_address"]
                 new_available_space = current_storage_node["available_space"] - shard_size
                 new_contracts_entry = {'active_contracts': {"shard_id":shard_id, "contract_address": contract}}
                 query = {"username":storage_node_username}
@@ -236,8 +244,15 @@ def pay_contract_handler(authorized_username):
                 segments[i]["shards"][unassigned_shards-1]["ip_address"] = ip_address
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
+                segments[i]["shards"][unassigned_shards-1]["shared_authentication_key"] = shared_authentication_key
+
                 unassigned_shards -= 1
-    query = {"username": authorized_username }
-    new_values = { "$set": { "segments": segments } }
-    files.update_one(query, new_values)
-    return make_response("Contract payment successful", 200)
+            retry_count -= 1
+    # TODO: Mark that this file is paid
+    if retry_count != 0:
+        query = {"username": authorized_username }
+        new_values = { "$set": { "segments": segments } }
+        files.update_one(query, new_values)
+        return make_response("Contract payment successful", 200)
+    else:
+        return make_response("Failed to assign storage nodes", 400)

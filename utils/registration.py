@@ -26,13 +26,16 @@ def registration_add_user(username, password, user_type, extra_info=None):
             return True
         # Hash a password for the first time, with a randomly-generated salt
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        # User node
         if user_type == "user":
-            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), 'request': False,
-                              'active_contracts': [], 'available_request_count': 0})
+            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'),
+                              'pending_contract': False, 'active_contracts': [], 'seeds': 0,
+                              'ip_address': "155.155.155.155", "port": '5000', "pending_contract_paid": False})
+        # Storage node
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
-                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'], "available_space": extra_info["available_space"],
-                              'active_contracts': []})
+                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'], "available_space":
+                                  extra_info["available_space"], 'active_contracts': []})
         return False
     except:
         return True

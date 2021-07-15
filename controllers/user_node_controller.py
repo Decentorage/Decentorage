@@ -56,7 +56,7 @@ def get_active_contracts(authorized_username):
 
 @authorize_user
 def create_file(authorized_username):
-    if get_user_state(authorized_username) != '2':
+    if get_user_state(authorized_username) != '3':
         return make_response("No contract requests available.", 403)
     response = create_file_handler(authorized_username, json.loads(request.json))
     if response:
