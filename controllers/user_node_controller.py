@@ -3,6 +3,7 @@ from handlers import add_user, verify_user, authorize_user, get_user_active_cont
     create_file_handler
 from utils import create_token
 import json
+import random
 
 
 # __________________________ Unauthorized requests __________________ #
@@ -63,6 +64,6 @@ def create_file(authorized_username):
 
 
 @authorize_user
-def test(authorized_username):
-    print(authorized_username)
-    return make_response("success", 201)
+def get_price():
+    # TODO: Implement proper price equation.
+    return random.randint(0, 1000)
