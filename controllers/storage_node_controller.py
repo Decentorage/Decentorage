@@ -14,8 +14,9 @@ def storage_signup():
     try:
         username = request.json["username"]
         password = request.json["password"]
-        if username and password:
-            username_already_exists = add_storage(username, password)
+        wallet_address = request.json["wallet_address"]
+        if username and password and wallet_address:
+            username_already_exists = add_storage(username, password, wallet_address)
             if username_already_exists:
                 return make_response("username already exits", 403)
             else:
@@ -23,7 +24,8 @@ def storage_signup():
         else:
             return make_response("missing parameters", 400)
     except:
-        return make_response("Server error", 500)
+
+        return make_response("missing parameters", 400)
 
 
 def storage_signin():
@@ -40,7 +42,7 @@ def storage_signin():
         else:
             return make_response("missing parameters", 400)
     except:
-        return make_response("Server error", 500)
+        return make_response("missing parameters", 400)
 
 
 @authorize_storage

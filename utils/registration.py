@@ -5,7 +5,7 @@ from datetime import timedelta
 import jwt
 
 
-def registration_add_user(username, password, user_type):
+def registration_add_user(username, password, user_type, extra_info=None):
     """
     Add user to the system
     When a user sign up for the first time this function hash the password given, then add user to database
@@ -31,7 +31,8 @@ def registration_add_user(username, password, user_type):
                               'active_contracts': [], 'available_request_count': 0})
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
-                              "last_heartbeat": -1})
+                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'],
+                              'active_contracts': []})
         return False
     except:
         return True
