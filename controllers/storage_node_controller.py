@@ -1,7 +1,8 @@
 from flask import make_response, jsonify
-from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler, get_availability_handler, test_contract_handler
+from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler, get_availability_handler, test_contract_handler, update_connection_handler
 from utils import create_token
 from flask import request
+import re
 
 
 @authorize_storage
@@ -71,3 +72,24 @@ def test_contract():
     else:
         return make_response("missing parameters", 400)
     return test_contract_handler()
+
+
+@authorize_storage
+def update_connection(authorized_username):
+    
+    ip_address = request.json["ip_address"]
+    if not isinstance(ip_address, str):
+        return make_response("IP address must be a string.", 422)
+
+    if not re.match("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",ip_address):
+        return make_response("Invalid IP address.", 422)
+    
+    port = request.json["port"]
+
+    if not isinstance(port, str):
+        return make_response("Port must be a string.", 422)
+    if not re.match("^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$", port):
+        return make_response("Invalid port number.", 422)
+
+    return update_connection_handler(authorized_username, ip_address, port)
+

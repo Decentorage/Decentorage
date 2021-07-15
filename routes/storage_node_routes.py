@@ -1,4 +1,4 @@
-from controllers import heartbeat, withdraw, storage_signin, storage_signup, get_availability, test_contract
+from controllers import heartbeat, withdraw, storage_signin, storage_signup, get_availability, test_contract, update_connection
 import app
 
 storage_url_prefix = '/storage'
@@ -14,6 +14,7 @@ def add_storage_urls():
     app.app.add_url_rule(storage_url_prefix + "/signup", view_func=storage_signup, methods=["POST"])
     app.app.add_url_rule(storage_url_prefix + "/signin", view_func=storage_signin, methods=["POST"])
     app.app.add_url_rule(storage_url_prefix + "/withdraw", view_func=withdraw, methods=["POST"])
+    app.app.add_url_rule(storage_url_prefix + "/updateConnection", view_func=update_connection, methods=["POST"])
     # app.app.add_url_rule(storage_url_prefix + "/auditResponse", methods=["POST"])  # result
     # app.app.add_url_rule(storage_url_prefix + "/clientConnectionPort", methods=["POST"])  # port, communication port
     # app.app.add_url_rule(storage_url_prefix + "/publicIpChange", methods=["POST"])  # decentorage port, ip_address
