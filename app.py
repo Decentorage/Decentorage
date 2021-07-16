@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 import pymongo
 import config
 from routes import add_storage_urls, add_user_urls
@@ -50,3 +50,16 @@ def run(env):
         add_storage_urls()
         add_user_urls()
         app.run(host="0.0.0.0", port=5000)
+
+
+@app.after_request
+def inject_cors_headers(response):
+    if 'Origin' in request.headers:
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin'))
+    else:
+        response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Methods', 'DELETE, GET, HEAD, OPTIONS, POST, PUT, PATCH')
+    response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, User-Agent, Content-Range, Token, Code')
+    response.headers.add('Access-Control-Expose-Headers', 'DAV, content-length, Allow')
+    return response
