@@ -182,7 +182,7 @@ def pay_contract_handler(authorized_username):
     if not files:
         abort(500, "Database error.")
 
-    query = {"username":authorized_username, "done_uploading": False, "paid": False}
+    query = {"username": authorized_username, "done_uploading": False, "paid": False}
     file = files.find_one(query)
     if not file:
         abort(404, "There is no unpaid file being uploaded.")
@@ -231,14 +231,14 @@ def pay_contract_handler(authorized_username):
                 # TODO send authentication key, inform storage node, and get port
                 port = "4500"
                 # Storage node update
-                shard_id =  segments[i]["shards"][unassigned_shards-1]["shard_id"]
-                current_storage_node = possible_storage_nodes[index]
+                shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
+                current_storage_node = possible_storage_nodes[index]        # ...
                 storage_node_username = current_storage_node["username"]
                 ip_address = "12.12.12.12"                   # TODO: current_storage_node["ip_address"]
                 new_available_space = current_storage_node["available_space"] - shard_size
                 new_contracts_entry = {'active_contracts': {"shard_id":shard_id, "contract_address": contract}}
-                query = {"username":storage_node_username}
-                new_values = {"$set": { "available_space": new_available_space},"$push": new_contracts_entry}
+                query = {"username": storage_node_username}
+                new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
                 storage_nodes.update_one(query, new_values)
                 # File update
                 segments[i]["shards"][unassigned_shards-1]["ip_address"] = ip_address
@@ -250,9 +250,12 @@ def pay_contract_handler(authorized_username):
             retry_count -= 1
     # TODO: Mark that this file is paid
     if retry_count != 0:
-        query = {"username": authorized_username }
-        new_values = { "$set": { "segments": segments } }
+        query = {"username": authorized_username}
+        new_values = {"$set": {"segments": segments}}
         files.update_one(query, new_values)
+        user_nodes = app.database["user_nodes"]
+        new_values = {"$set": {"pending_contract_paid": True}}
+        user_nodes.update_one(query, new_values)
         return make_response("Contract payment successful", 200)
     else:
         return make_response("Failed to assign storage nodes", 400)

@@ -88,7 +88,6 @@ def heartbeat_handler(authorized_username):
 
 def add_storage(username, password, wallet_address, available_space):
     extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
-    print(extra_info)
     return registration_add_user(username, password, "storage", extra_info)
 
 
@@ -218,7 +217,6 @@ def get_availability_handler(authorized_username):
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     availability = get_availability(storage_node)
-    print(availability)
     return flask.Response(status=200,response=str(availability))
 
 
