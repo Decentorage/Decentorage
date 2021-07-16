@@ -255,6 +255,7 @@ def pay_contract_handler(authorized_username):
         new_values = {"$set": {"segments": segments, "paid": True}}
         files.update_one(query, new_values)
         user_nodes = app.database["user_nodes"]
+        query = {"username": authorized_username}
         new_values = {"$set": {"pending_contract_paid": True}}
         user_nodes.update_one(query, new_values)
         return make_response("Contract payment successful", 200)
