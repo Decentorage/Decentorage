@@ -237,11 +237,12 @@ def pay_contract_handler(authorized_username):
                 storage_node_username = current_storage_node["username"]
                 ip_address = "12.12.12.12"                   # TODO: current_storage_node["ip_address"]
                 new_available_space = current_storage_node["available_space"] - shard_size
-                new_contracts_entry = {'active_contracts': {"shard_id":shard_id, "contract_address": contract}}
+                new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": contract}}
                 query = {"username": storage_node_username}
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
                 storage_nodes.update_one(query, new_values)
                 # File update
+                segments[i]["shards"][unassigned_shards-1]["shard_id"] = shard_id
                 segments[i]["shards"][unassigned_shards-1]["ip_address"] = ip_address
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
