@@ -10,7 +10,7 @@ bytecode = os.environ["BYTECODE"]
 private_key = os.environ["PRIVATE_KEY"]
 
 w3 = Web3(Web3.HTTPProvider(infura_url))
-w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+# w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 w3.eth.defaultAccount = address
 
 
