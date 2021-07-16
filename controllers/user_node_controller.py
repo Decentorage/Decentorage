@@ -12,6 +12,7 @@ def user_signup():
     try:
         username = request.json["username"]
         password = request.json["password"]
+
         if username and password:
             username_already_exists = add_user(username, password)
             if username_already_exists:

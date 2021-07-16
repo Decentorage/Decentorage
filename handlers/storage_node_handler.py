@@ -236,10 +236,12 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
     # storage_nodes = web3_library.get_storage_nodes(contract)
     # return flask.Response(status=200, response="storage node address: " + str(storage_nodes[0]))
 
-    # delete node contract = web3_library.get_contract(contract_address) before = web3_library.get_storage_nodes(
-    # contract) web3_library.delete_node(contract, storage_address) after = web3_library.get_storage_nodes(contract)
-    # return flask.Response(status=200, response="storage nodes count before: " + str(len(before)) + '\n' + "storage
-    # nodes count after: " + str(len(after)))
+    # delete node
+    # contract = web3_library.get_contract(contract_address)
+    # before = web3_library.get_storage_nodes(contract)
+    # web3_library.delete_node(contract, storage_address)
+    # after = web3_library.get_storage_nodes(contract)
+    # return flask.Response(status=200, response="storage nodes count before: " + str(len(before)) + '\n' + "storage nodes count after: " + str(len(after)))
 
     # swap node
     # contract = web3_library.get_contract(contract_address)
@@ -250,7 +252,7 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
     # return flask.Response(status=200, response="storage nodes count before: " + str(
     #     len(before)) + '\n' + "storage nodes count after: " + str(len(after)))
 
-    # pay storage node
+    # user paying
     # contract = web3_library.get_contract(contract_address)
     # balance_before = web3_library.get_balance(contract)
     # web3_library.user_pay(contract)
