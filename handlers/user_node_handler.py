@@ -202,11 +202,12 @@ def pay_contract_handler(authorized_username):
         unassigned_shards = total_shards
         shard_size = segment["shard_size"]
         available_space_query = {"available_space": {"$gt": shard_size}}
-        retry_count = 10
+        retry_count = 100
         while unassigned_shards > 0 and retry_count > 0:
             possible_storage_nodes = storage_nodes.find(available_space_query)
-            possible_storage_nodes_count = storage_nodes.count_documents(available_space_query)
-            
+            # possible_storage_nodes_count = storage_nodes.count_documents(available_space_query)
+            counting_clone = possible_storage_nodes.clone()
+            possible_storage_nodes_count = counting_clone.count()
             if possible_storage_nodes_count == 0:
                 abort(500, "No storage nodes available")
 
@@ -250,8 +251,8 @@ def pay_contract_handler(authorized_username):
             retry_count -= 1
     # TODO: Mark that this file is paid
     if retry_count != 0:
-        query = {"username": authorized_username}
-        new_values = {"$set": {"segments": segments}}
+        query = {"username": authorized_username, "done_uploading": False, "paid": False}
+        new_values = {"$set": {"segments": segments, "paid": True}}
         files.update_one(query, new_values)
         user_nodes = app.database["user_nodes"]
         new_values = {"$set": {"pending_contract_paid": True}}
