@@ -50,8 +50,6 @@ def heartbeat_handler(authorized_username):
     if not storage_nodes:
         abort(500, "Database server error.")
 
-
-
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     
@@ -71,25 +69,26 @@ def heartbeat_handler(authorized_username):
             heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            return flask.Response(status=200, response="Heartbeat successful.")
         elif node_last_heartbeat == -2 or node_last_heartbeat < last_interval_start_datetime: # First heartbeat in new interval
             heartbeats = 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            return flask.Response(status=200, response="Heartbeat successful.")
         elif node_last_heartbeat < now: # regular update
             heartbeats = int(storage_node["heartbeats"]) + 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
             storage_nodes.update_one(query, new_values)
-            flask.Response(status=200,response="Heartbeat successful.")
+            return flask.Response(status=200, response="Heartbeat successful.")
         else:
             abort(429, 'Heartbeat Ignored')
 
 # _________________________________ Registrations _________________________________#
 
 
-def add_storage(username, password):
-    return registration_add_user(username, password, "storage")
+def add_storage(username, password, wallet_address, available_space):
+    extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
+    return registration_add_user(username, password, "storage", extra_info)
 
 
 def verify_storage(username, password):
@@ -218,7 +217,6 @@ def get_availability_handler(authorized_username):
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     availability = get_availability(storage_node)
-    print(availability)
     return flask.Response(status=200,response=str(availability))
 
 
@@ -286,3 +284,17 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
     # balance_after = web3_library.get_balance(contract)
     # return flask.Response(status=200, response="contract balance before = " + str(
     #     balance_before) + "\ncontract balance before = " + str(balance_after))
+
+
+    # _________________________________ Connection handler functions _________________________________#
+
+
+def update_connection_handler(authorized_username, ip_address, port):
+    storage_nodes  = get_storage_nodes_collection()
+    if not storage_nodes:
+        abort(500, 'Database server error.')
+    query = {"username": authorized_username}
+    new_values = {"$set": {"ip_address": ip_address, "port": port}}
+    storage_nodes.update_one(query, new_values)
+    return flask.Response(status=200, response="Connection updated.")
+

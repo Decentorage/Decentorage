@@ -1,6 +1,9 @@
 from flask import request, jsonify, make_response
-from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state
+from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
+    create_file_handler, get_file_info_handler, pay_contract_handler
 from utils import create_token
+import json
+import os
 
 
 # __________________________ Unauthorized requests __________________ #
@@ -53,6 +56,35 @@ def get_active_contracts(authorized_username):
 
 
 @authorize_user
-def test(authorized_username):
-    print(authorized_username)
-    return make_response("success", 201)
+def create_file(authorized_username):
+    if get_user_state(authorized_username) != '3':
+        return make_response("No contract requests available.", 403)
+    response = create_file_handler(authorized_username, json.loads(request.json))
+    if response:
+        return make_response("File created successfully", 201)
+
+
+@authorize_user
+def get_price(authorized_username):
+    download_count = int(request.args.get("download_count"))
+    duration_in_months = int(request.args.get("duration_in_months"))
+    file_size = int(request.args.get("file_size"))
+    price_per_storage = file_size / 1099511627776
+    price_per_download = price_per_storage * 1.8
+    admin_fees = 0.01 * price_per_storage
+    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    if price < 0.25:
+        price = 0.25
+    return make_response(jsonify({'price': price}), 200)
+
+@authorize_user
+def get_file_info(authorized_username):
+    return get_file_info_handler(authorized_username)
+
+@authorize_user
+def pay_contract(authorized_username):
+    return pay_contract_handler(authorized_username)
+
+@authorize_user
+def get_decentorage_wallet_address(authorized_username):
+    return make_response(jsonify({'decentorage_wallet_address': os.environ["ADDRESS"]}), 200)

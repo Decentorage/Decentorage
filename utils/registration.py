@@ -5,7 +5,7 @@ from datetime import timedelta
 import jwt
 
 
-def registration_add_user(username, password, user_type):
+def registration_add_user(username, password, user_type, extra_info=None):
     """
     Add user to the system
     When a user sign up for the first time this function hash the password given, then add user to database
@@ -17,7 +17,7 @@ def registration_add_user(username, password, user_type):
     """
     try:
         if user_type == "user":
-            users = app.database["user"]
+            users = app.database["user_nodes"]
         else:
             users = app.database["storage_nodes"]
         query = {"username": username}
@@ -26,12 +26,16 @@ def registration_add_user(username, password, user_type):
             return True
         # Hash a password for the first time, with a randomly-generated salt
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        # User node
         if user_type == "user":
-            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), 'request': False,
-                              'active_contracts': []})
+            users.insert_one({"username": username, "password": hashed_password.decode('utf-8'),
+                              'pending_contract': False, 'active_contracts': [], 'seeds': 0,
+                              'ip_address': "155.155.155.155", "port": '5000', "pending_contract_paid": False})
+        # Storage node
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
-                              "last_heartbeat": -1})
+                              "last_heartbeat": -1, "wallet_address": extra_info['wallet_address'], "available_space":
+                                  extra_info["available_space"], 'active_contracts': []})
         return False
     except:
         return True
@@ -50,7 +54,7 @@ def registration_verify_user(username, password, user_type):
     """
     try:
         if user_type == "user":
-            users = app.database["user"]
+            users = app.database["user_nodes"]
         else:
             users = app.database["storage_nodes"]
         query = {"username": username}
