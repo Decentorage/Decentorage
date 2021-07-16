@@ -1,6 +1,9 @@
+import socket
+
 from flask.helpers import make_response
 from flask.json import jsonify
 import app
+import json
 import jwt
 from flask import abort, request
 from functools import wraps
@@ -32,6 +35,32 @@ def get_user_active_contracts(username):
 
 def add_user(username, password):
     return registration_add_user(username, password, "user")
+
+
+def check_connection(node, shard_id, shared_authentication_key, shard_size):
+    decentorage_port = node["port"]
+    ip_address = node["ip_address"]
+
+    port = 0
+    req = {'type': 'upload',
+           'port': 0,
+           'shard_id': shard_id,
+           'auth': shared_authentication_key,
+           'size': shard_size}
+
+    req = json.dumps(req).encode('utf-8')
+    try:
+        # start tcp connection with storage node
+        client_socket = socket.socket()
+        client_socket.connect((ip_address, decentorage_port))
+        client_socket.sendall(req)
+        port = int(client_socket.recv(1024).decode("utf-8"))
+        return port
+
+    except socket.error:
+        return port
+
+    client_socket.close()
 
 
 def verify_user(username, password):
@@ -215,26 +244,37 @@ def pay_contract_handler(authorized_username):
             unused_possible_storage_nodes_indices = unordered_possible_storage_nodes_indices[unassigned_shards:]
             size_unused = len(unused_possible_storage_nodes_indices)
             index_unused = 0
+
+
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
             for j, index in enumerate(unordered_possible_storage_nodes_indices):
+                shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
+                shared_authentication_key = ''.join(
+                    random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+
                 # TODO check if node is alive
                 fail = False
-                if fail:
+                port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key, shard_size)
+                while not port:
                     if index_unused < size_unused:
-                        unordered_possible_storage_nodes_indices[j], unused_possible_storage_nodes_indices[index_unused], index = \
-                            unused_possible_storage_nodes_indices[index_unused], unordered_possible_storage_nodes_indices[j],\
-                                 unused_possible_storage_nodes_indices[index_unused]
+                        index = unused_possible_storage_nodes_indices[index_unused]
+                        index_unused += 1
+                        port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key,
+                                                shard_size)
+
                     else:
-                        continue
+                        fail = True
+                        break
+                if fail:
+                    continue
                 # Shared authentication key for communication
-                shared_authentication_key = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
-                # TODO send authentication key, inform storage node, and get port
-                port = "4500"
+                # TODO send authentication key, inform storage node, and get portclientSocket = socket.socket()
+
                 # Storage node update
-                shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
                 current_storage_node = possible_storage_nodes[index]        # ...
                 storage_node_username = current_storage_node["username"]
-                ip_address = "12.12.12.12"                   # TODO: current_storage_node["ip_address"]
+                ip_address = current_storage_node["ip_address"]
+
                 new_available_space = current_storage_node["available_space"] - shard_size
                 new_contracts_entry = {'active_contracts': {"shard_id":shard_id, "contract_address": contract}}
                 query = {"username": storage_node_username}
