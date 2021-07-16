@@ -135,7 +135,7 @@ def create_file_handler(authorized_username, new_file):
     segments_list = []
     for segment_no, segment in enumerate(new_file_segments):
         # k and m values should be checked for violations
-        total_shards =  segment["m"]
+        total_shards = segment["m"]
         shard_list = []
         for i in range(total_shards):
             shard_id = str(_id) + "$DCNTRG$" + str(segment_no) + "$DCNTRG$" + str(i)
@@ -242,7 +242,6 @@ def pay_contract_handler(authorized_username):
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
                 storage_nodes.update_one(query, new_values)
                 # File update
-                segments[i]["shards"][unassigned_shards-1]["shard_id"] = shard_id
                 segments[i]["shards"][unassigned_shards-1]["ip_address"] = ip_address
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
