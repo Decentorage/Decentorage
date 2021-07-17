@@ -146,7 +146,7 @@ def create_file_handler(authorized_username, new_file):
     filename = new_file['filename']
 
     pay_limit = calculate_price(new_file["download_count"], new_file["duration_in_months"], new_file["file_size"])
-    contract = web3_library.create_contract(pay_limit - 1)
+    # contract = web3_library.create_contract(pay_limit - 1)
     files = app.database["files"]
     users = app.database["user_nodes"]
     if not files or not users:
@@ -164,7 +164,7 @@ def create_file_handler(authorized_username, new_file):
         "file_size": new_file["file_size"],
         "download_count": new_file["download_count"],
         "duration_in_months": new_file["duration_in_months"],
-        "contract": contract.address,
+        "contract": "",
         "username": authorized_username,
         "done_uploading": False,
         "paid": False,
