@@ -1,4 +1,4 @@
-from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price, get_file_info, pay_contract, get_decentorage_wallet_address
+from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price, get_file_info, pay_contract, get_decentorage_wallet_address, start_download
 import app
 user_url_prefix = '/user'
 
@@ -17,4 +17,5 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/signup", view_func=user_signup, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/signin", view_func=user_signin, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/createFile", view_func=create_file, methods=["POST"])
+    app.app.add_url_rule(user_url_prefix + "/startDownload", view_func=start_download, methods=["POST"])
     # TODO: endpoint to handle user after uploading file
