@@ -332,7 +332,7 @@ def get_contract_handler(authorized_username):
     file = files.find_one(query)    
     if not file:
         abort(404, "No unpaid contracts")
-    response = {"contract_addresss":file["contract"], "filename": file["filename"]}
+    response = {"contract_addresss":file["contract"], "filename": file["filename"], "price": file["price"]}
     return make_response(jsonify(response), 200)
 
 # _________________________________ Download Handlers _________________________________#
