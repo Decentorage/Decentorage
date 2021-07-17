@@ -220,16 +220,16 @@ def pay_contract_handler(authorized_username):
     if not file:
         abort(404, "There is no unpaid file being uploaded.")
 
-    contract = file["contract"]
-    file_price = file["price"]
-    payment_contract = web3_library.get_contract(contract)
-    payment_contract_balance = web3_library.get_balance(payment_contract)
-    if payment_contract_balance >= file_price:
-        paid = True
-    else:
-        paid = False
-    if not paid:
-        abort(403, "Contract is not paid yet.")
+    # contract = file["contract"]
+    # file_price = file["price"]
+    # payment_contract = web3_library.get_contract(contract)
+    # payment_contract_balance = web3_library.get_balance(payment_contract)
+    # if payment_contract_balance >= file_price:
+    #     paid = True
+    # else:
+    #     paid = False
+    # if not paid:
+    #     abort(403, "Contract is not paid yet.")
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
