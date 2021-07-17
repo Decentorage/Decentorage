@@ -320,7 +320,18 @@ def calculate_price(download_count, duration_in_months, file_size):
     if price < 0.25:
         price = 0.25
     return price
+# _________________________________ Contract Handlers _________________________________#
 
+def get_contract_handler(authorized_username):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+    query = {"username": authorized_username, "paid": False}
+    file = files.find_one(query)    
+    if not file:
+        abort(404, "No unpaid contracts")
+    response = {"contract_addresss":file["contract"], "filename": file["filename"]}
+    return make_response(jsonify(response), 200)
 
 # _________________________________ Download Handlers _________________________________#
 
@@ -331,7 +342,7 @@ def get_port():
 def start_download_handler(authorized_username, filename):
     files = app.database["files"]
     storage_nodes = app.database["storage_nodes"]
-    if not files:
+    if not files or not storage_nodes:
         abort(500, "Database error.")
     query = {"username": authorized_username, "filename": filename}
     file = files.find_one(query)
@@ -351,11 +362,8 @@ def start_download_handler(authorized_username, filename):
         shards_acquired = 0
         for sh_no, shard in enumerate(shards):
             if shards_acquired == total_shards_needed:
-                print("br1")
                 break
-            print(shard["shard_lost"], type(shard["shard_lost"]))
             if shard["shard_lost"]:
-                print("co1")
                 continue
             # TODO try to open a port on storage_node to receive data
             query = {"username":shard["shard_node_username"]}
@@ -386,3 +394,5 @@ def start_download_handler(authorized_username, filename):
                 abort(500, "File is lost.")
         segments_to_return.append(shards_to_return)
     return make_response(jsonify({'segments': segments_to_return},200))
+
+    # TODO create a function to decrement doownload_count when download ends
