@@ -178,7 +178,10 @@ def create_file_handler(authorized_username, new_file):
                 {
                     "shard_id": shard_id,
                     "shard_node_username": "",
-                    "done_uploading": False
+                    "done_uploading": False,
+                    "shard_lost": False,
+                    "user_node_done": False,
+                    "storage_node_done": False
                 }
             )
         segments_list.append({
@@ -294,7 +297,6 @@ def pay_contract_handler(authorized_username):
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
                 segments[i]["shards"][unassigned_shards-1]["shared_authentication_key"] = shared_authentication_key
-                segments[i]["shards"][unassigned_shards-1]["shard_lost"] = False
 
                 unassigned_shards -= 1
             retry_count -= 1
@@ -395,4 +397,51 @@ def start_download_handler(authorized_username, filename):
         segments_to_return.append(shards_to_return)
     return make_response(jsonify({'segments': segments_to_return},200))
 
-    # TODO create a function to decrement doownload_count when download ends
+    # TODO create a function to decrement doownload_count when file download ends
+
+def file_done_uploading_handler():
+    pass
+
+def shard_done_uploading_handler(authorized_username, shard_id_original, audits):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+    if not audits or not shard_id_original:
+        abort(400, "Invalid json object")
+    query = {"username": authorized_username, "done_uploading": False}
+    file = files.find_one(query)
+    if not file:
+        abort(404, "File not found.")
+ 
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_splitted = shard_id.split("$DCNTRG$")
+    segment_no = shard_id_splitted[1]
+    shard_no = shard_id_splitted[2]
+    segments = file["segments"]
+    segment = segments[segment_no]
+    shards = segment["shards"]
+    shard = shards[shard_no]
+    if shard["shard_id"] != shard_id_original:
+        abort(500, "Database error.")
+    done_uploading = shard["storage_node_done"]
+    if done_uploading:
+        new_values = {
+                    "$set": 
+                    {
+                        "segments."+str(segment_no)+".shards."+str(shard_no)+".done_uploading": True,
+                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
+                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
+                    }
+                }
+    else:
+        new_values = {
+                    "$set": 
+                    {
+                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
+                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
+                    }
+                }
+    files.update_one(query, new_values)
+
+    return make_response("Sucessfull.", 200)
