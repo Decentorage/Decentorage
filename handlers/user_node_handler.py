@@ -286,6 +286,7 @@ def pay_contract_handler(authorized_username):
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
                 segments[i]["shards"][unassigned_shards-1]["shared_authentication_key"] = shared_authentication_key
+                segments[i]["shards"][unassigned_shards-1]["shard_lost"] = False
 
                 unassigned_shards -= 1
             retry_count -= 1
