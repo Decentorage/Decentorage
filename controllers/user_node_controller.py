@@ -1,6 +1,6 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
-    create_file_handler, get_file_info_handler, pay_contract_handler
+    create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price
 from utils import create_token
 import json
 import os
@@ -10,6 +10,7 @@ import os
 
 def user_signup():
     try:
+        print(request.json)
         username = request.json["username"]
         password = request.json["password"]
 
@@ -69,12 +70,7 @@ def get_price(authorized_username):
     download_count = int(request.args.get("download_count"))
     duration_in_months = int(request.args.get("duration_in_months"))
     file_size = int(request.args.get("file_size"))
-    price_per_storage = file_size / 1099511627776
-    price_per_download = price_per_storage * 1.8
-    admin_fees = 0.01 * price_per_storage
-    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
-    if price < 0.25:
-        price = 0.25
+    price = calculate_price(download_count, duration_in_months, file_size)
     return make_response(jsonify({'price': price}), 200)
 
 @authorize_user

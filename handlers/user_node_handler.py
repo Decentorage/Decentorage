@@ -7,6 +7,8 @@ import json
 import jwt
 from flask import abort, request
 from functools import wraps
+
+import web3_library
 from utils import registration_verify_user, registration_add_user
 import random
 import string
@@ -143,7 +145,8 @@ def create_file_handler(authorized_username, new_file):
             abort(400, "Invalid json object")
     filename = new_file['filename']
 
-    # TODO create empty contract
+    pay_limit = calculate_price(new_file["download_count"], new_file["duration_in_months"], new_file["file_size"])
+    contract = web3_library.create_contract(pay_limit - 1)
     files = app.database["files"]
     users = app.database["user_nodes"]
     if not files or not users:
@@ -161,10 +164,11 @@ def create_file_handler(authorized_username, new_file):
         "file_size": new_file["file_size"],
         "download_count": new_file["download_count"],
         "duration_in_months": new_file["duration_in_months"],
-        "contract": "",
+        "contract": contract.address,
         "username": authorized_username,
         "done_uploading": False,
-        "paid": False
+        "paid": False,
+        "price": pay_limit
         }
     _id = files.insert_one(query).inserted_id
     segments_list = []
@@ -221,13 +225,17 @@ def pay_contract_handler(authorized_username):
     file = files.find_one(query)
     if not file:
         abort(404, "There is no unpaid file being uploaded.")
-    
-    # TODO check if contract is paid
-    contract = file["contract"]
-    # Assuming payment successful
-    paid = True
-    if not paid:
-        abort(403, "Contract is not paid yet.")
+
+    # contract = file["contract"]
+    # file_price = file["price"]
+    # payment_contract = web3_library.get_contract(contract)
+    # payment_contract_balance = web3_library.get_balance(payment_contract)
+    # if payment_contract_balance >= file_price:
+    #     paid = True
+    # else:
+    #     paid = False
+    # if not paid:
+    #     abort(403, "Contract is not paid yet.")
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
@@ -298,6 +306,7 @@ def pay_contract_handler(authorized_username):
                 segments[i]["shards"][unassigned_shards-1]["port"] = port
                 segments[i]["shards"][unassigned_shards-1]["shard_node_username"] = storage_node_username
                 segments[i]["shards"][unassigned_shards-1]["shared_authentication_key"] = shared_authentication_key
+                segments[i]["shards"][unassigned_shards-1]["shard_lost"] = False
 
                 unassigned_shards -= 1
             retry_count -= 1
@@ -313,3 +322,13 @@ def pay_contract_handler(authorized_username):
         return make_response("Contract payment successful", 200)
     else:
         return make_response("Failed to assign storage nodes", 400)
+
+
+def calculate_price(download_count, duration_in_months, file_size):
+    price_per_storage = file_size / 1099511627776
+    price_per_download = price_per_storage * 1.8
+    admin_fees = 0.01 * price_per_storage
+    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    if price < 0.25:
+        price = 0.25
+    return price
