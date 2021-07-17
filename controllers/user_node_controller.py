@@ -1,6 +1,6 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
-    create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price
+    create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price, start_download_handler
 from utils import create_token
 import json
 import os
@@ -84,3 +84,8 @@ def pay_contract(authorized_username):
 @authorize_user
 def get_decentorage_wallet_address(authorized_username):
     return make_response(jsonify({'decentorage_wallet_address': os.environ["ADDRESS"]}), 200)
+
+@authorize_user
+def start_download(authorized_username):
+    filename = request.json["filename"]
+    return start_download_handler(authorized_username, filename)

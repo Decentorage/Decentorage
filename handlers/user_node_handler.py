@@ -226,7 +226,7 @@ def pay_contract_handler(authorized_username):
     if not file:
         abort(404, "There is no unpaid file being uploaded.")
 
-    # contract = file["contract"]
+    contract = file["contract"]
     # file_price = file["price"]
     # payment_contract = web3_library.get_contract(contract)
     # payment_contract_balance = web3_library.get_balance(payment_contract)
@@ -332,3 +332,69 @@ def calculate_price(download_count, duration_in_months, file_size):
     if price < 0.25:
         price = 0.25
     return price
+
+
+# _________________________________ Download Handlers _________________________________#
+
+def get_port():
+    return 50505 # TODO
+
+
+def start_download_handler(authorized_username, filename):
+    files = app.database["files"]
+    storage_nodes = app.database["storage_nodes"]
+    if not files:
+        abort(500, "Database error.")
+    query = {"username": authorized_username, "filename": filename}
+    file = files.find_one(query)
+    if not file:
+        abort(404, "File not found.")
+    if file["download_count"] < 1:
+        abort(405, "Your ran out of downloads.")
+    if not file["done_uploading"]:
+        abort(404, "File is not fully uploaded yet.")
+    segments = file["segments"]
+    segments_to_return = []
+    for seg_no, segment in enumerate(segments):
+        shards_to_return = []
+        shards = segment["shards"]
+        total_shards_needed = segment["k"]
+        temporarily_inactive = 0
+        shards_acquired = 0
+        for sh_no, shard in enumerate(shards):
+            if shards_acquired == total_shards_needed:
+                print("br1")
+                break
+            print(shard["shard_lost"], type(shard["shard_lost"]))
+            if shard["shard_lost"]:
+                print("co1")
+                continue
+            # TODO try to open a port on storage_node to receive data
+            query = {"username":shard["shard_node_username"]}
+            storage_node = storage_nodes.find_one(query)
+            ip_address = storage_node["ip_address"]
+            decentorage_port = storage_node["port"]
+            port = get_port()
+            if port == 0:
+                temporarily_inactive += 1
+                continue
+
+            shard_id = shard["shard_id"]
+            shard_id = shard_id.encode('utf-8')
+            shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+            shard_id_splitted = shard_id.split("$DCNTRG$")
+            segment_no = shard_id_splitted[1]
+            shard_no = shard_id_splitted[2]
+            if int(segment_no) != seg_no or int(shard_no) != sh_no:
+                abort(500, "Database error.")
+            shards_to_return.append({"ip_address":ip_address, "port":port, "segment_no": segment_no, "shard_no": shard_no})
+            shards_acquired += 1
+
+        if shards_acquired < total_shards_needed:
+            missing_shards = total_shards_needed - shards_acquired
+            if missing_shards <= temporarily_inactive:
+                abort(424, "File is temporary unavailable")
+            else:
+                abort(500, "File is lost.")
+        segments_to_return.append(shards_to_return)
+    return make_response(jsonify({'segments': segments_to_return},200))
