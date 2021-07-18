@@ -16,7 +16,7 @@ class BaseConfig:
 
 
 class DevelopmentConfig(BaseConfig):
-    DATABASE_URI =  os.environ['MONGODB_DEV_URI']
+    DATABASE_URI = os.environ['MONGODB_DEV_URI']
     DATABASE_NAME = os.environ['MONGODB_DEV_NAME']
     ENV = 'development'
     DEBUG = True

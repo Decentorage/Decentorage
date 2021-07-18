@@ -54,10 +54,10 @@ def run(env):
 
 @app.after_request
 def inject_cors_headers(response):
-    if 'Origin' in request.headers:
-        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin'))
-    else:
-        response.headers.add('Access-Control-Allow-Origin', '*')
+    #if 'Origin' in request.headers:
+    #    response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin'))
+    #else:
+    response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Allow-Methods', 'DELETE, GET, HEAD, OPTIONS, POST, PUT, PATCH')
     response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, User-Agent, Content-Range, Token, Code')

@@ -1,16 +1,16 @@
 import datetime
 import math
-
+import random
 import flask
 import app
 import web3_library
-import os
-#_________________________________ Check database functions _________________________________#
+from bson.objectid import ObjectId
 from functools import wraps
 from flask import abort, request
 import jwt
 from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
+
 
 def get_storage_nodes_collection():
     if app.database:
@@ -46,7 +46,7 @@ def get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
 
 
 def heartbeat_handler(authorized_username):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, "Database server error.")
 
@@ -61,31 +61,62 @@ def heartbeat_handler(authorized_username):
         next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
         new_last_heartbeat = now - datetime.timedelta(minutes=now.minute % interheartbeat_minutes - interheartbeat_minutes,
                                                       seconds=now.second, microseconds=now.microsecond)
-        if new_last_heartbeat >= next_interval_start_datetime: # if new heartbeat is in new interval, flag new last heartbeat = -2
+        # if new heartbeat is in new interval, flag new last heartbeat = -2
+        if new_last_heartbeat >= next_interval_start_datetime:
             new_last_heartbeat = -2
         
         node_last_heartbeat = storage_node["last_heartbeat"]
         if node_last_heartbeat == -1: # First heartbeat ever
             heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
-            storage_nodes.update_one(query, new_values)
-            return flask.Response(status=200, response="Heartbeat successful.")
-        elif node_last_heartbeat == -2 or node_last_heartbeat < last_interval_start_datetime: # First heartbeat in new interval
+        # First heartbeat in new interval
+        elif node_last_heartbeat == -2 or node_last_heartbeat < last_interval_start_datetime:
             heartbeats = 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
-            storage_nodes.update_one(query, new_values)
-            return flask.Response(status=200, response="Heartbeat successful.")
         elif node_last_heartbeat < now: # regular update
             heartbeats = int(storage_node["heartbeats"]) + 1
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
-            storage_nodes.update_one(query, new_values)
-            return flask.Response(status=200, response="Heartbeat successful.")
         else:
             abort(429, 'Heartbeat Ignored')
+        # TODO: Check random storage node availability, New thread.
+        storage_nodes.update_one(query, new_values)
+        return flask.Response(status=200, response="Heartbeat successful.")
+
+
+def random_checks():
+    storage_nodes = app.database["storage_nodes"]
+    all_storage_nodes = storage_nodes.find({})
+
+    counting_clone = all_storage_nodes.clone()
+    storage_nodes_count = counting_clone.count()
+    if storage_nodes_count == 0:
+        return
+
+    random_index = random.randint(0, storage_nodes_count - 1)
+    print("Print random index", random_index, storage_nodes_count)
+
+    storage_node = all_storage_nodes[random_index]
+    print("Storage Node:", storage_node["username"])
+
+    storage_availability = get_availability(storage_node)
+    contract_addresses = []
+    for active_contract in storage_node["active_contracts"]:
+        contract_addresses.append(active_contract["contract_address"])
+    print(contract_addresses)
+    print(storage_node["username"], ":", storage_availability)
+    print(storage_node["active_contracts"])
+    print("Terminate flag:", storage_availability < Configuration.availability_minimum_threshold)
+
+
+def terminate_storage(storage_node):
+    files = app.database["files"]
+    contract_addresses = []
+    for active_contract in storage_node["active_contracts"]:
+        contract_addresses.append(active_contract["contract_address"])
+    files.find({"contract": {"$in": contract_addresses}})
+
 
 # _________________________________ Registrations _________________________________#
-
-
 def add_storage(username, password, wallet_address, available_space):
     extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
     return registration_add_user(username, password, "storage", extra_info)
@@ -146,8 +177,10 @@ def get_availability(storage_node):
     now = datetime.datetime.utcnow()
     years_since_epoch = now.year - decentorage_epoch.year
     months_since_epoch = now.month - decentorage_epoch.month
-    last_interval_start_datetime = get_last_interval_start_datetime(now,years_since_epoch,months_since_epoch)
-    next_interval_start_datetime = get_next_interval_start_datetime(now,years_since_epoch,months_since_epoch)
+    last_interval_start_datetime = get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch)
+    if (last_interval_start_datetime - now) < datetime.timedelta(days=1):
+        return 100
+    next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
     full_availability_heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
     if full_availability_heartbeats == 0:
         return 100
@@ -186,7 +219,7 @@ def storage_node_address_with_contract_nodes(contract, storage_address):
 
 # TODO: the function not tested yet should be tested later
 def withdraw_handler(authorized_username, shard_id):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
     query = {"username": authorized_username}
@@ -211,13 +244,13 @@ def withdraw_handler(authorized_username, shard_id):
 
 
 def get_availability_handler(authorized_username):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     availability = get_availability(storage_node)
-    return flask.Response(status=200,response=str(availability))
+    return flask.Response(status=200, response=str(availability))
 
 
 def test_contract_handler(pay_limit, contract_address, storage_address):
@@ -285,7 +318,6 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
     # return flask.Response(status=200, response="contract balance before = " + str(
     #     balance_before) + "\ncontract balance before = " + str(balance_after))
 
-
     # _________________________________ Connection handler functions _________________________________#
 
 
@@ -298,3 +330,49 @@ def update_connection_handler(authorized_username, ip_address, port):
     storage_nodes.update_one(query, new_values)
     return flask.Response(status=200, response="Connection updated.")
 
+
+def storage_shard_done_uploading_handler(shard_id_original):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_split = shard_id.split("$DCNTRG$")
+    document_id = shard_id_split[0]
+    segment_no = int(shard_id_split[1])
+    shard_no = int(shard_id_split[2])
+
+    query = {"_id": ObjectId(document_id)}
+
+    file = files.find_one(query)
+    if not file:
+        abort(404, "File not found.")
+
+    segments = file["segments"]
+    segment = segments[segment_no]
+    shards = segment["shards"]
+    shard = shards[shard_no]
+    if shard["shard_id"] != shard_id_original:
+        abort(500, "Database error.")
+
+    done_uploading = shard["user_node_done"]
+    # If user also signaled that the shard is done uploading then the shard is uploaded successfully otherwise only
+    # storage signaled that the shard is uploaded
+    if done_uploading:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".done_uploading": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
+                }
+        }
+    else:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
+                }
+        }
+    # Update file document
+    files.update_one(query, new_values)
+    return True

@@ -1,7 +1,7 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
     create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price, start_download_handler,\
-        get_contract_handler, file_done_uploading_handler, shard_done_uploading_handler
+        get_contract_handler, file_done_uploading_handler, user_shard_done_uploading_handler, verify_transaction_handler
 from utils import create_token
 import json
 import os
@@ -74,35 +74,48 @@ def get_price(authorized_username):
     price = calculate_price(download_count, duration_in_months, file_size)
     return make_response(jsonify({'price': price}), 200)
 
+
 @authorize_user
 def get_file_info(authorized_username):
     return get_file_info_handler(authorized_username)
+
 
 @authorize_user
 def pay_contract(authorized_username):
     return pay_contract_handler(authorized_username)
 
+
 @authorize_user
 def get_decentorage_wallet_address(authorized_username):
     return make_response(jsonify({'decentorage_wallet_address': os.environ["ADDRESS"]}), 200)
+
 
 @authorize_user
 def start_download(authorized_username):
     filename = request.json["filename"]
     return start_download_handler(authorized_username, filename)
 
+
 @authorize_user
 def get_contract(authorized_username):
     return get_contract_handler(authorized_username)
 
-@authorize_user # TODO
+
+@authorize_user     # TODO
 def file_done_uploading(authorized_username):
     pass
 
+
 @authorize_user
-def shard_done_uploading(authorized_username):
+def user_shard_done_uploading(authorized_username):
     shard_id = request.json["shard_id"]
     audits = request.json["audits"]
     if not audits or not shard_id:
-        make_response("Invalid json object.", 400)    
-    return shard_done_uploading_handler(authorized_username, shard_id, audits)
+        return make_response("Invalid json object.", 400)
+    return user_shard_done_uploading_handler(authorized_username, shard_id, audits)
+
+
+@authorize_user
+def verify_transaction(authorized_username):
+    transaction = request.json["transactionHash"]
+    return verify_transaction_handler(authorized_username, transaction)
