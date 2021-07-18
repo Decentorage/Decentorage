@@ -266,7 +266,6 @@ def pay_contract_handler(authorized_username):
             size_unused = len(unused_possible_storage_nodes_indices)
             index_unused = 0
 
-
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
             for j, index in enumerate(unordered_possible_storage_nodes_indices):
                 print("--------------START4--------------")
@@ -312,7 +311,7 @@ def pay_contract_handler(authorized_username):
 
                 unassigned_shards -= 1
             retry_count -= 1
-    # TODO: Mark that this file is paid
+
     if retry_count != 0:
         query = {"username": authorized_username, "done_uploading": False, "paid": False}
         new_values = {"$set": {"segments": segments, "paid": True}}
@@ -334,8 +333,9 @@ def calculate_price(download_count, duration_in_months, file_size):
     if price < 0.25:
         price = 0.25
     return price
-# _________________________________ Contract Handlers _________________________________#
 
+
+# _________________________________ Contract Handlers _________________________________#
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -344,11 +344,11 @@ def get_contract_handler(authorized_username):
     file = files.find_one(query)    
     if not file:
         abort(404, "No unpaid contracts")
-    response = {"contract_addresss":file["contract"], "filename": file["filename"], "price": file["price"]}
+    response = {"contract_address": file["contract"], "filename": file["filename"], "price": file["price"]}
     return make_response(jsonify(response), 200)
 
-# _________________________________ Download Handlers _________________________________#
 
+# _________________________________ Download Handlers _________________________________#
 def get_port():
     return 50505 # TODO
 
@@ -392,9 +392,9 @@ def start_download_handler(authorized_username, filename):
             shard_id = shard["shard_id"]
             shard_id = shard_id.encode('utf-8')
             shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-            shard_id_splitted = shard_id.split("$DCNTRG$")
-            segment_no = shard_id_splitted[1]
-            shard_no = shard_id_splitted[2]
+            shard_id_split = shard_id.split("$DCNTRG$")
+            segment_no = shard_id_split[1]
+            shard_no = shard_id_split[2]
             if int(segment_no) != seg_no or int(shard_no) != sh_no:
                 abort(500, "Database error.")
             shards_to_return.append({"ip_address":ip_address, "port":port, "segment_no": segment_no, "shard_no": shard_no})
@@ -411,10 +411,12 @@ def start_download_handler(authorized_username, filename):
 
     # TODO create a function to decrement doownload_count when file download ends
 
+
 def file_done_uploading_handler():
     pass
 
-def shard_done_uploading_handler(authorized_username, shard_id_original, audits):
+
+def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
     files = app.database["files"]
     if not files:
         abort(500, "Database error.")
@@ -428,9 +430,9 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
  
     shard_id = shard_id_original.encode('utf-8')
     shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-    shard_id_splitted = shard_id.split("$DCNTRG$")
-    segment_no = int(shard_id_splitted[1])
-    shard_no = int(shard_id_splitted[2])
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_no = int(shard_id_split[1])
+    shard_no = int(shard_id_split[2])
     segments = file["segments"]
     segment = segments[segment_no]
     shards = segment["shards"]
