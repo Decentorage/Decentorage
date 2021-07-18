@@ -146,7 +146,7 @@ def create_file_handler(authorized_username, new_file):
     filename = new_file['filename']
 
     pay_limit = calculate_price(new_file["download_count"], new_file["duration_in_months"], new_file["file_size"])
-    # contract = web3_library.create_contract(pay_limit - 1)
+    contract = web3_library.create_contract(pay_limit - 1)
     files = app.database["files"]
     users = app.database["user_nodes"]
     if not files or not users:
@@ -164,7 +164,7 @@ def create_file_handler(authorized_username, new_file):
         "file_size": new_file["file_size"],
         "download_count": new_file["download_count"],
         "duration_in_months": new_file["duration_in_months"],
-        "contract": "",
+        "contract": contract.address,
         "username": authorized_username,
         "done_uploading": False,
         "paid": False,
@@ -421,6 +421,7 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
     if not audits or not shard_id_original:
         abort(400, "Invalid json object")
     query = {"username": authorized_username, "done_uploading": False}
+    print()
     file = files.find_one(query)
     if not file:
         abort(404, "File not found.")
@@ -428,8 +429,8 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
     shard_id = shard_id_original.encode('utf-8')
     shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
     shard_id_splitted = shard_id.split("$DCNTRG$")
-    segment_no = shard_id_splitted[1]
-    shard_no = shard_id_splitted[2]
+    segment_no = int(shard_id_splitted[1])
+    shard_no = int(shard_id_splitted[2])
     segments = file["segments"]
     segment = segments[segment_no]
     shards = segment["shards"]
