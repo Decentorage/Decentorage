@@ -1,6 +1,7 @@
 from flask import make_response, jsonify
 from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler,\
-    get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler
+    get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler, \
+    random_checks
 from utils import create_token
 from flask import request
 import re
@@ -46,6 +47,11 @@ def storage_signin():
             return make_response("missing parameters", 400)
     except:
         return make_response("missing parameters", 400)
+
+
+def test():
+    random_checks()
+    return make_response("success", 200)
 
 
 @authorize_storage

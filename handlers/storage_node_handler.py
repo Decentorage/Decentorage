@@ -1,9 +1,9 @@
 import datetime
 import math
+import random
 import flask
 import app
 import web3_library
-import os
 from bson.objectid import ObjectId
 from functools import wraps
 from flask import abort, request
@@ -82,9 +82,41 @@ def heartbeat_handler(authorized_username):
         storage_nodes.update_one(query, new_values)
         return flask.Response(status=200, response="Heartbeat successful.")
 
+
+def random_checks():
+    storage_nodes = app.database["storage_nodes"]
+    all_storage_nodes = storage_nodes.find({})
+
+    counting_clone = all_storage_nodes.clone()
+    storage_nodes_count = counting_clone.count()
+    if storage_nodes_count == 0:
+        return
+
+    random_index = random.randint(0, storage_nodes_count - 1)
+    print("Print random index", random_index, storage_nodes_count)
+
+    storage_node = all_storage_nodes[random_index]
+    print("Storage Node:", storage_node["username"])
+
+    storage_availability = get_availability(storage_node)
+    contract_addresses = []
+    for active_contract in storage_node["active_contracts"]:
+        contract_addresses.append(active_contract["contract_address"])
+    print(contract_addresses)
+    print(storage_node["username"], ":", storage_availability)
+    print(storage_node["active_contracts"])
+    print("Terminate flag:", storage_availability < Configuration.availability_minimum_threshold)
+
+
+def terminate_storage(storage_node):
+    files = app.database["files"]
+    contract_addresses = []
+    for active_contract in storage_node["active_contracts"]:
+        contract_addresses.append(active_contract["contract_address"])
+    files.find({"contract": {"$in": contract_addresses}})
+
+
 # _________________________________ Registrations _________________________________#
-
-
 def add_storage(username, password, wallet_address, available_space):
     extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
     return registration_add_user(username, password, "storage", extra_info)
@@ -187,7 +219,7 @@ def storage_node_address_with_contract_nodes(contract, storage_address):
 
 # TODO: the function not tested yet should be tested later
 def withdraw_handler(authorized_username, shard_id):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
     query = {"username": authorized_username}

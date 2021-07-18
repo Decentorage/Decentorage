@@ -1,5 +1,5 @@
 from controllers import heartbeat, withdraw, storage_signin, storage_signup, get_availability, test_contract, \
-    update_connection, storage_shard_done_uploading
+    update_connection, storage_shard_done_uploading, test
 import app
 
 storage_url_prefix = '/storage'
@@ -10,6 +10,7 @@ def add_storage_urls():
     app.app.add_url_rule(storage_url_prefix + "/heartbeat", view_func=heartbeat, methods=["GET"])
     app.app.add_url_rule(storage_url_prefix + "/availability", view_func=get_availability, methods=["GET"])
     app.app.add_url_rule(storage_url_prefix + "/test", view_func=test_contract, methods=["GET"])
+    app.app.add_url_rule(storage_url_prefix + "/test2", view_func=test, methods=["GET"])
 
     # Post Methods
     app.app.add_url_rule(storage_url_prefix + "/signup", view_func=storage_signup, methods=["POST"])

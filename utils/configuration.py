@@ -5,8 +5,6 @@ import datetime
 
 
 class Configuration:
-
-
 	#---------------- Avalability and Heartbeat settings ----------------#
 	# How many minutes between each heartbeat
 	interheartbeat_minutes = 10
@@ -16,3 +14,5 @@ class Configuration:
 	resetting_months = 2
 	# Minimum availability to send money
 	minimum_availability = 70
+
+	availability_minimum_threshold = 70

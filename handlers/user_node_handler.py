@@ -1,5 +1,4 @@
 import socket
-
 from flask.helpers import make_response
 from flask.json import jsonify
 import app
@@ -7,14 +6,13 @@ import json
 import jwt
 from flask import abort, request
 from functools import wraps
-
 import web3_library
 from utils import registration_verify_user, registration_add_user
 import random
 import string
 
 
-# _________________________________ PLACEHOLDER _________________________________#
+# _________________________________ PLACEHOLDER _________________________________ #
 def get_user_active_contracts(username):
     """
         get user active contracts
@@ -24,11 +22,18 @@ def get_user_active_contracts(username):
            - List of active contracts of a specific user.
     """
     try:
-        users = app.database["user_nodes"]
-        query = {"username": username}
-        user = users.find_one(query)
-        if user['active_contracts']:
-            return user['active_contracts']
+        files = app.database["files"]
+        query = {"username": username, "done_uploading": True}
+        user_files = files.find(query)
+        if user_files:
+            result = []
+            for user_file in user_files:
+                result.append({
+                    "filename": user_file["filename"],
+                    "size": user_file["file_size"],
+                    "download_count": user_file["download_count"]
+                })
+            return result
         else:
             return []
     except:
@@ -380,7 +385,7 @@ def start_download_handler(authorized_username, filename):
             if shard["shard_lost"]:
                 continue
             # TODO try to open a port on storage_node to receive data
-            query = {"username":shard["shard_node_username"]}
+            query = {"username": shard["shard_node_username"]}
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]
             decentorage_port = storage_node["port"]
