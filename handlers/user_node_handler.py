@@ -40,7 +40,7 @@ def add_user(username, password):
 
 
 def check_connection(node, shard_id, shared_authentication_key, shard_size):
-    decentorage_port = node["port"]
+    decentorage_port = int(node["port"])
     ip_address = node["ip_address"]
 
     port = 0
@@ -54,12 +54,18 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     try:
         # start tcp connection with storage node
         client_socket = socket.socket()
+        print(ip_address)
+        print(decentorage_port)
         client_socket.connect((ip_address, decentorage_port))
+        print("connected")
         client_socket.sendall(req)
+        print("send request")
         port = int(client_socket.recv(1024).decode("utf-8"))
+        print("received")
         return port
 
     except socket.error:
+        print("disconnected")
         return port
 
     client_socket.close()
@@ -236,16 +242,19 @@ def pay_contract_handler(authorized_username):
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
-    
+
+    print("--------------START--------------")
     for i, segment in enumerate(segments):
         total_shards = segment["m"]
         unassigned_shards = total_shards
         shard_size = segment["shard_size"]
         available_space_query = {"available_space": {"$gt": shard_size}}
         retry_count = 100
+        print("--------------START2--------------")
         while unassigned_shards > 0 and retry_count > 0:
+            print("--------------START3--------------")
             possible_storage_nodes = storage_nodes.find(available_space_query)
-            # possible_storage_nodes_count = storage_nodes.count_documents(available_space_query)
+
             counting_clone = possible_storage_nodes.clone()
             possible_storage_nodes_count = counting_clone.count()
             if possible_storage_nodes_count == 0:
@@ -260,6 +269,7 @@ def pay_contract_handler(authorized_username):
 
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
             for j, index in enumerate(unordered_possible_storage_nodes_indices):
+                print("--------------START4--------------")
                 shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
                 shared_authentication_key = ''.join(
                     random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
@@ -267,18 +277,20 @@ def pay_contract_handler(authorized_username):
                 # TODO check if node is alive
                 fail = False
                 port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key, shard_size)
+                print("first try", index)
                 while not port:
                     if index_unused < size_unused:
                         index = unused_possible_storage_nodes_indices[index_unused]
                         index_unused += 1
                         port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key,
                                                 shard_size)
-
+                        print("retry", index)
                     else:
                         fail = True
                         break
                 if fail:
                     continue
+                print("--------------START5--------------")
                 # Shared authentication key for communication
                 # TODO send authentication key, inform storage node, and get portclientSocket = socket.socket()
 
@@ -409,6 +421,7 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
     if not audits or not shard_id_original:
         abort(400, "Invalid json object")
     query = {"username": authorized_username, "done_uploading": False}
+    print()
     file = files.find_one(query)
     if not file:
         abort(404, "File not found.")
@@ -416,8 +429,8 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
     shard_id = shard_id_original.encode('utf-8')
     shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
     shard_id_splitted = shard_id.split("$DCNTRG$")
-    segment_no = shard_id_splitted[1]
-    shard_no = shard_id_splitted[2]
+    segment_no = int(shard_id_splitted[1])
+    shard_no = int(shard_id_splitted[2])
     segments = file["segments"]
     segment = segments[segment_no]
     shards = segment["shards"]
