@@ -7,7 +7,7 @@ class BaseConfig:
     MAIL_PORT = 587
     MAIL_USE_TLS = True
     MAIL_USE_SSL = False
-    SECRET_KEY = 'decentorageSecretKeyIsSALTS'
+    SECRET_KEY = os.environ['SECRET_KEY']
     CODE_KEY = 'decentorageCode'
     MAIL_USERNAME = 'no-reply@decentorage.tech'
     MAIL_PASSWORD = ''
