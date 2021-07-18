@@ -349,8 +349,33 @@ def get_contract_handler(authorized_username):
 
 
 # _________________________________ Download Handlers _________________________________#
-def get_port():
-    return 50505 # TODO
+def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authentication_key):
+    port = 0
+    req = {'type': 'download',
+           'port': 0,
+           'shard_id': shard_id,
+           'auth': shared_authentication_key,
+           'size': shard_size}
+
+    req = json.dumps(req).encode('utf-8')
+    try:
+        # start tcp connection with storage node
+        client_socket = socket.socket()
+        print(ip_address)
+        print(decentorage_port)
+        client_socket.connect((ip_address, decentorage_port))
+        print("connected")
+        client_socket.sendall(req)
+        print("send request")
+        port = int(client_socket.recv(1024).decode("utf-8"))
+        print("received")
+        return port
+
+    except socket.error:
+        print("disconnected")
+        return port
+
+    client_socket.close()
 
 
 def start_download_handler(authorized_username, filename):
@@ -384,7 +409,9 @@ def start_download_handler(authorized_username, filename):
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]
             decentorage_port = storage_node["port"]
-            port = get_port()
+            shared_authentication_key = ''.join(
+                random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+            port = get_port(ip_address, decentorage_port, shard["shard_id"], segment["shard_size"], shared_authentication_key)
             if port == 0:
                 temporarily_inactive += 1
                 continue
@@ -397,7 +424,8 @@ def start_download_handler(authorized_username, filename):
             shard_no = shard_id_split[2]
             if int(segment_no) != seg_no or int(shard_no) != sh_no:
                 abort(500, "Database error.")
-            shards_to_return.append({"ip_address":ip_address, "port":port, "segment_no": segment_no, "shard_no": shard_no})
+            shards_to_return.append({"ip_address":ip_address, "port": port, "segment_no": segment_no,
+                                     "shard_no": shard_no, "auth": shared_authentication_key})
             shards_acquired += 1
 
         if shards_acquired < total_shards_needed:
