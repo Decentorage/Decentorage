@@ -13,7 +13,6 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/getDecentorageWalletAddress", view_func=get_decentorage_wallet_address,
                          methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getContract", view_func=get_contract, methods=["GET"])
-    app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["GET"])
 
 
     # Post Methods
@@ -23,3 +22,4 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/startDownload", view_func=start_download, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/shardDoneUploading", view_func=shard_done_uploading, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/filedDoneUploading", view_func=file_done_uploading, methods=["POST"])
+    app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["POST"])

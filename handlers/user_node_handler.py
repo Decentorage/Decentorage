@@ -146,7 +146,7 @@ def create_file_handler(authorized_username, new_file):
     filename = new_file['filename']
 
     pay_limit = calculate_price(new_file["download_count"], new_file["duration_in_months"], new_file["file_size"])
-    contract = web3_library.create_contract(pay_limit - 1)
+    contract = web3_library.create_contract(pay_limit - 10)
     files = app.database["files"]
     users = app.database["user_nodes"]
     if not files or not users:
@@ -230,15 +230,15 @@ def pay_contract_handler(authorized_username):
         abort(404, "There is no unpaid file being uploaded.")
 
     contract = file["contract"]
-    # file_price = file["price"]
-    # payment_contract = web3_library.get_contract(contract)
-    # payment_contract_balance = web3_library.get_balance(payment_contract)
-    # if payment_contract_balance >= file_price:
-    #     paid = True
-    # else:
-    #     paid = False
-    # if not paid:
-    #     abort(403, "Contract is not paid yet.")
+    file_price = file["price"]
+    payment_contract = web3_library.get_contract(contract)
+    payment_contract_balance = web3_library.get_balance(payment_contract)
+    if payment_contract_balance >= file_price:
+        paid = True
+    else:
+        paid = False
+    if not paid:
+        abort(403, "Contract is not paid yet.")
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
@@ -312,7 +312,7 @@ def pay_contract_handler(authorized_username):
 
                 unassigned_shards -= 1
             retry_count -= 1
-    # TODO: Mark that this file is paid
+
     if retry_count != 0:
         query = {"username": authorized_username, "done_uploading": False, "paid": False}
         new_values = {"$set": {"segments": segments, "paid": True}}
@@ -327,13 +327,19 @@ def pay_contract_handler(authorized_username):
 
 
 def calculate_price(download_count, duration_in_months, file_size):
-    price_per_storage = file_size / 1099511627776
-    price_per_download = price_per_storage * 1.8
-    admin_fees = 0.01 * price_per_storage
-    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
+    # one ether = 41 dollars
+    # one tera storage for 3 dollars
+    # price_per_kb = 3 in ether / tera
+    price_per_kb = 0.07317 / 1099511627776
+    # price per download 7 dollars = 0.12195122 in ether
+    price_per_download = 0.12195122
+    # price per month  = 1 dollar = 0.024390244 in ether
+    price_per_month = 0.024390244
+    price = price_per_kb * file_size + price_per_month * duration_in_months + price_per_download * download_count
     if price < 0.25:
         price = 0.25
-    return price
+    # to convert to wei
+    return price*1000000000000000000
 # _________________________________ Contract Handlers _________________________________#
 
 def get_contract_handler(authorized_username):
@@ -461,7 +467,7 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
 
 
 def verify_transaction_handler(authorized_username, transaction):
-    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    hash_receipt = web3_library.w3.eth.get_transaction_receipt(transaction)
     if not hash_receipt:
         return make_response("transaction has not been mined", 405)
     else:
