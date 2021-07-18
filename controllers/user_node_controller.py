@@ -1,7 +1,7 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
     create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price, start_download_handler,\
-        get_contract_handler, file_done_uploading_handler, shard_done_uploading_handler
+        get_contract_handler, file_done_uploading_handler, shard_done_uploading_handler, verify_transaction_handler
 from utils import create_token
 import json
 import os
@@ -99,6 +99,7 @@ def get_contract(authorized_username):
 def file_done_uploading(authorized_username):
     pass
 
+
 @authorize_user
 def shard_done_uploading(authorized_username):
     shard_id = request.json["shard_id"]
@@ -106,3 +107,9 @@ def shard_done_uploading(authorized_username):
     if not audits or not shard_id:
         make_response("Invalid json object.", 400)    
     return shard_done_uploading_handler(authorized_username, shard_id, audits)
+
+
+@authorize_user
+def verify_transaction(authorized_username):
+    transaction = request.json["transactionHash"]
+    return verify_transaction_handler(authorized_username, transaction)

@@ -1,4 +1,4 @@
-from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price, get_file_info, pay_contract, get_decentorage_wallet_address, start_download, get_contract, shard_done_uploading, file_done_uploading
+from controllers import user_signup, user_signin, get_active_contracts, get_state, create_file, get_price, get_file_info, pay_contract, get_decentorage_wallet_address, start_download, get_contract, shard_done_uploading, file_done_uploading, verify_transaction
 import app
 user_url_prefix = '/user'
 
@@ -13,6 +13,7 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/getDecentorageWalletAddress", view_func=get_decentorage_wallet_address,
                          methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getContract", view_func=get_contract, methods=["GET"])
+    app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["GET"])
 
 
     # Post Methods

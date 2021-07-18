@@ -445,3 +445,26 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
     files.update_one(query, new_values)
 
     return make_response("Sucessfull.", 200)
+
+
+def verify_transaction_handler(authorized_username, transaction):
+    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    if not hash_receipt:
+        return make_response("transaction has not been mined", 405)
+    else:
+        transactions = app.database["transactions"]
+        if not transactions:
+            abort(500, "Database error.")
+        else:
+            transaction_object = transactions.find_one({'transaction': transaction})
+            if transaction_object:
+                return make_response("transaction already used", 409)
+            else:
+                transactions.insert_one({'transaction': transaction})
+                users = app.database["user_nodes"]
+                if not users:
+                    abort(500, "Database error.")
+                query = {"username": authorized_username}
+                new_values = {"$inc": {"seeds": 1}}
+                users.update_one(query, new_values)
+                return make_response("seeds has incremented", 200)
