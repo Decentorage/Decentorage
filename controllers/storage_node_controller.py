@@ -34,6 +34,7 @@ def storage_signup():
 
 def storage_signin():
     try:
+        print(request.json)
         username = request.json["username"]
         password = request.json["password"]
         if username and password:
@@ -44,7 +45,7 @@ def storage_signin():
             else:
                 return make_response("wrong password or username", 403)
         else:
-            return make_response("missing parameters", 400)
+            return make_response("missing values", 400)
     except:
         return make_response("missing parameters", 400)
 
