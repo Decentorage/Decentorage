@@ -29,8 +29,7 @@ def registration_add_user(username, password, user_type, extra_info=None):
         # User node
         if user_type == "user":
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'),
-                              'pending_contract': False, 'active_contracts': [], 'seeds': 0,
-                              "pending_contract_paid": False})
+                              'pending_contract': False, 'seeds': 0, "pending_contract_paid": False})
         # Storage node
         else:
             users.insert_one({"username": username, "password": hashed_password.decode('utf-8'), "heartbeats": 0,
