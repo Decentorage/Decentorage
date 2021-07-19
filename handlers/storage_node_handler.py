@@ -85,7 +85,7 @@ def heartbeat_handler(authorized_username):
 
 def random_checks():
     storage_nodes = app.database["storage_nodes"]
-    all_storage_nodes = storage_nodes.find({})
+    all_storage_nodes = storage_nodes.find({"is_terminated": False})
 
     counting_clone = all_storage_nodes.clone()
     storage_nodes_count = counting_clone.count()
@@ -96,24 +96,42 @@ def random_checks():
     print("Print random index", random_index, storage_nodes_count)
 
     storage_node = all_storage_nodes[random_index]
-    print("Storage Node:", storage_node["username"])
 
     storage_availability = get_availability(storage_node)
     contract_addresses = []
     for active_contract in storage_node["active_contracts"]:
         contract_addresses.append(active_contract["contract_address"])
-    print(contract_addresses)
     print(storage_node["username"], ":", storage_availability)
-    print(storage_node["active_contracts"])
     print("Terminate flag:", storage_availability < Configuration.availability_minimum_threshold)
+    if storage_availability < Configuration.availability_minimum_threshold:
+        terminate_storage(storage_node)
 
 
 def terminate_storage(storage_node):
     files = app.database["files"]
+    storage_nodes = app.database["storage_nodes"]
+    if not files or not storage_nodes:
+        abort(500, "Database server error.")
     contract_addresses = []
     for active_contract in storage_node["active_contracts"]:
         contract_addresses.append(active_contract["contract_address"])
-    files.find({"contract": {"$in": contract_addresses}})
+    storage_files = files.find({"contract": {"$in": contract_addresses}})
+    for file in storage_files:
+        segments = file["segments"]
+        for segment_index, segment in enumerate(segments):
+            shards = segment["shards"]
+            for shard_index, shard in enumerate(shards):
+                if shard["shard_node_username"] == storage_node["username"]:
+                    shard["shard_lost"] = True
+                shards[shard_index] = shard
+            segments[segment_index]["shards"] = shards
+        query = {"_id": ObjectId(file["_id"])}
+        new_values = {"$set": {"segments": segments}}
+        files.update_one(query, new_values)
+
+    query = {"username": storage_node["username"]}
+    new_values = {"$set": {"is_terminated": True, "available_space": 0, "active_contracts": []}}
+    storage_nodes.update_one(query, new_values)
 
 
 # _________________________________ Registrations _________________________________#
@@ -172,22 +190,23 @@ def get_percentage(heartbeats, full_heartbeats):
 def get_availability(storage_node):
     last_heartbeat = storage_node["last_heartbeat"]
     heartbeats = storage_node["heartbeats"]
-    if heartbeats == 0:     # New node
-        return 0
+    if last_heartbeat == -1:     # New node
+        return 100
     now = datetime.datetime.utcnow()
     years_since_epoch = now.year - decentorage_epoch.year
     months_since_epoch = now.month - decentorage_epoch.month
     last_interval_start_datetime = get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch)
-    if (last_interval_start_datetime - now) < datetime.timedelta(days=1):
+    if (now - last_interval_start_datetime) < datetime.timedelta(days=1):
         return 100
     next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
     full_availability_heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
+
     if full_availability_heartbeats == 0:
         return 100
     
-    heartbeats += 1 # Taking current slot into account
+    heartbeats += 1     # Taking current slot into account
     availability = get_percentage(heartbeats, full_availability_heartbeats)
-    if last_heartbeat == -2: # transition state
+    if last_heartbeat == -2:    # transition state
         # First slot in new interval
         if now - last_interval_start_datetime <= datetime.timedelta(minutes=interheartbeat_minutes):
             return 100
@@ -197,8 +216,6 @@ def get_availability(storage_node):
         # new interval but not first slot
         else:
             return 0
-    elif last_heartbeat == -1:  # New node
-        return 0
     else:
         return availability
 
@@ -222,7 +239,7 @@ def withdraw_handler(authorized_username, shard_id):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
-    query = {"username": authorized_username}
+    query = {"username": authorized_username, "is_terminated": False}
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
     if storage_node:

@@ -253,7 +253,7 @@ def pay_contract_handler(authorized_username):
         total_shards = segment["m"]
         unassigned_shards = total_shards
         shard_size = segment["shard_size"]
-        available_space_query = {"available_space": {"$gt": shard_size}}
+        available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1}}
         retry_count = 100
         print("--------------START2--------------")
         while unassigned_shards > 0 and retry_count > 0:
