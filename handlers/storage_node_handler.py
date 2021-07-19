@@ -175,9 +175,34 @@ def authorize_storage(f):
         if not verify_storage(user['username'], user['password']):
             abort(401, 'No authorized user found.')
 
+        if is_terminated_storage(user["username"]):
+            abort(401, 'Storage is terminated.')
+
         return f(authorized_username=user['username'], *args, **kwargs)
 
     return decorated
+
+
+def is_terminated_storage(username):
+    """
+    Check if storage is terminated.
+    *Parameters:*
+        - *username(string)*: holds the value of the username.
+    *Returns:*
+        -*True*: if the user is terminated.
+        -*False*: if the user is not terminated.
+    """
+    try:
+        users = app.database["storage_nodes"]
+        query = {"username": username, "is_terminated": False}
+        user = users.find_one(query)
+        # Storage doesn't exit
+        if not user:
+            return True
+        else:
+            return False
+    except:
+        return True
 
 # _________________________________ Withdraw handler functions _________________________________#
 
