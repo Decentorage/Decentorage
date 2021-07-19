@@ -13,7 +13,5 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# Install pymongo srv for database
-RUN ["pip", "install", "pymongo[srv]"]
 # Run in development enviroment
 CMD ["python", "run.py", "--env", "dev"]
