@@ -14,7 +14,7 @@ def add_user_urls():
                          methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getContract", view_func=get_contract, methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["GET"])
-
+    app.app.add_url_rule(user_url_prefix + "/fileDoneUploading", view_func=file_done_uploading, methods=["GET"])
 
     # Post Methods
     app.app.add_url_rule(user_url_prefix + "/signup", view_func=user_signup, methods=["POST"])
@@ -24,8 +24,5 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/shardDoneUploading", view_func=user_shard_done_uploading, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/shardFailedUploading", view_func=user_shard_done_uploading,
                          methods=["POST"])
-    app.app.add_url_rule(user_url_prefix + "/fileDoneUploading", view_func=file_done_uploading, methods=["POST"])
-    # TODO: Termination logic(shard lost: true and don't pay and remove storage contracts).
     # TODO: Regeneration check the threshold and swap in smart contract and database.
     # TODO: Shard failed to upload swap, add to the contract if done uploading.
-    # TODO:

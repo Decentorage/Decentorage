@@ -340,7 +340,73 @@ def calculate_price(download_count, duration_in_months, file_size):
     return price
 
 
+def file_done_uploading_handler(authorized_username):
+    files = app.database["files"]
+    users = app.database["user_nodes"]
+    if not files or not users:
+        return False
+
+    # Update user state
+    query = {"username": authorized_username}
+    new_values = {"$set": {"pending_contract": False, "pending_contract_paid": False}}
+    users.update_one(query, new_values)
+
+    # Update file to done uploading
+    query = {"username": authorized_username, "done_uploading": False}
+    new_values = {"$set": {"done_uploading": True}}
+    files.update_one(query, new_values)
+
+    return True
+
+
+def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+    if not audits or not shard_id_original:
+        abort(400, "Invalid json object")
+    query = {"username": authorized_username, "done_uploading": False}
+    print()
+    file = files.find_one(query)
+    if not file:
+        abort(404, "File not found.")
+
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_no = int(shard_id_split[1])
+    shard_no = int(shard_id_split[2])
+    segments = file["segments"]
+    segment = segments[segment_no]
+    shards = segment["shards"]
+    shard = shards[shard_no]
+    if shard["shard_id"] != shard_id_original:
+        abort(500, "Database error.")
+    done_uploading = shard["storage_node_done"]
+    if done_uploading:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".done_uploading": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".user_node_done": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
+                }
+        }
+    else:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".user_node_done": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
+                }
+        }
+    files.update_one(query, new_values)
+
+    return make_response("Successful.", 200)
+
+
 # _________________________________ Contract Handlers _________________________________#
+# TODO create a function to decrement download_count when file download ends
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -351,6 +417,29 @@ def get_contract_handler(authorized_username):
         abort(404, "No unpaid contracts")
     response = {"contract_address": file["contract"], "filename": file["filename"], "price": file["price"]}
     return make_response(jsonify(response), 200)
+
+
+def verify_transaction_handler(authorized_username, transaction):
+    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    if not hash_receipt:
+        return make_response("transaction has not been mined", 405)
+    else:
+        transactions = app.database["transactions"]
+        if not transactions:
+            abort(500, "Database error.")
+        else:
+            transaction_object = transactions.find_one({'transaction': transaction})
+            if transaction_object:
+                return make_response("transaction already used", 409)
+            else:
+                transactions.insert_one({'transaction': transaction})
+                users = app.database["user_nodes"]
+                if not users:
+                    abort(500, "Database error.")
+                query = {"username": authorized_username}
+                new_values = {"$inc": {"seeds": 1}}
+                users.update_one(query, new_values)
+                return make_response("seeds has incremented", 200)
 
 
 # _________________________________ Download Handlers _________________________________#
@@ -442,78 +531,3 @@ def start_download_handler(authorized_username, filename):
                 abort(500, "File is lost.")
         segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"]})
     return make_response(jsonify({'segments': segments_to_return}), 200)
-
-    # TODO create a function to decrement download_count when file download ends
-
-
-def file_done_uploading_handler():
-    pass
-
-
-def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
-    files = app.database["files"]
-    if not files:
-        abort(500, "Database error.")
-    if not audits or not shard_id_original:
-        abort(400, "Invalid json object")
-    query = {"username": authorized_username, "done_uploading": False}
-    print()
-    file = files.find_one(query)
-    if not file:
-        abort(404, "File not found.")
- 
-    shard_id = shard_id_original.encode('utf-8')
-    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-    shard_id_split = shard_id.split("$DCNTRG$")
-    segment_no = int(shard_id_split[1])
-    shard_no = int(shard_id_split[2])
-    segments = file["segments"]
-    segment = segments[segment_no]
-    shards = segment["shards"]
-    shard = shards[shard_no]
-    if shard["shard_id"] != shard_id_original:
-        abort(500, "Database error.")
-    done_uploading = shard["storage_node_done"]
-    if done_uploading:
-        new_values = {
-                    "$set": 
-                    {
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".done_uploading": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
-                    }
-                }
-    else:
-        new_values = {
-                    "$set": 
-                    {
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
-                    }
-                }
-    files.update_one(query, new_values)
-
-    return make_response("Successful.", 200)
-
-
-def verify_transaction_handler(authorized_username, transaction):
-    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
-    if not hash_receipt:
-        return make_response("transaction has not been mined", 405)
-    else:
-        transactions = app.database["transactions"]
-        if not transactions:
-            abort(500, "Database error.")
-        else:
-            transaction_object = transactions.find_one({'transaction': transaction})
-            if transaction_object:
-                return make_response("transaction already used", 409)
-            else:
-                transactions.insert_one({'transaction': transaction})
-                users = app.database["user_nodes"]
-                if not users:
-                    abort(500, "Database error.")
-                query = {"username": authorized_username}
-                new_values = {"$inc": {"seeds": 1}}
-                users.update_one(query, new_values)
-                return make_response("seeds has incremented", 200)

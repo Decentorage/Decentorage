@@ -101,9 +101,13 @@ def get_contract(authorized_username):
     return get_contract_handler(authorized_username)
 
 
-@authorize_user     # TODO
+@authorize_user
 def file_done_uploading(authorized_username):
-    pass
+    response = file_done_uploading_handler(authorized_username)
+    if response:
+        return make_response("success", 200)
+    else:
+        return make_response("Database error", 500)
 
 
 @authorize_user
