@@ -368,7 +368,7 @@ def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authenti
         client_socket = socket.socket()
         print(ip_address)
         print(decentorage_port)
-        client_socket.connect((ip_address, decentorage_port))
+        client_socket.connect((ip_address, int(decentorage_port)))
         print("connected")
         client_socket.sendall(req)
         print("send request")
@@ -429,8 +429,9 @@ def start_download_handler(authorized_username, filename):
             shard_no = shard_id_split[2]
             if int(segment_no) != seg_no or int(shard_no) != sh_no:
                 abort(500, "Database error.")
-            shards_to_return.append({"ip_address":ip_address, "port": port, "segment_no": segment_no,
-                                     "shard_no": shard_no, "auth": shared_authentication_key})
+            shards_to_return.append({"ip_address": ip_address, "port": port, "segment_no": segment_no,
+                                     "shard_id": shard["shard_id"], "shard_no": shard_no,
+                                     "auth": shared_authentication_key})
             shards_acquired += 1
 
         if shards_acquired < total_shards_needed:
@@ -439,10 +440,10 @@ def start_download_handler(authorized_username, filename):
                 abort(424, "File is temporary unavailable")
             else:
                 abort(500, "File is lost.")
-        segments_to_return.append(shards_to_return)
-    return make_response(jsonify({'segments': segments_to_return},200))
+        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"]})
+    return make_response(jsonify({'segments': segments_to_return}), 200)
 
-    # TODO create a function to decrement doownload_count when file download ends
+    # TODO create a function to decrement download_count when file download ends
 
 
 def file_done_uploading_handler():
@@ -492,7 +493,7 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
                 }
     files.update_one(query, new_values)
 
-    return make_response("Sucessfull.", 200)
+    return make_response("Successful.", 200)
 
 
 def verify_transaction_handler(authorized_username, transaction):
