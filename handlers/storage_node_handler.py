@@ -85,33 +85,71 @@ def heartbeat_handler(authorized_username):
 
 def random_checks():
     storage_nodes = app.database["storage_nodes"]
-    all_storage_nodes = storage_nodes.find({"is_terminated": False})
-
-    counting_clone = all_storage_nodes.clone()
-    storage_nodes_count = counting_clone.count()
-    if storage_nodes_count == 0:
-        return
-
-    random_index = random.randint(0, storage_nodes_count - 1)
-    print("Print random index", random_index, storage_nodes_count)
-
-    storage_node = all_storage_nodes[random_index]
-
-    storage_availability = get_availability(storage_node)
-    contract_addresses = []
-    for active_contract in storage_node["active_contracts"]:
-        contract_addresses.append(active_contract["contract_address"])
-    print(storage_node["username"], ":", storage_availability)
-    print("Terminate flag:", storage_availability < Configuration.availability_minimum_threshold)
-    if storage_availability < Configuration.availability_minimum_threshold:
-        terminate_storage(storage_node)
-
-
-def terminate_storage(storage_node):
     files = app.database["files"]
-    storage_nodes = app.database["storage_nodes"]
-    if not files or not storage_nodes:
+    if not storage_nodes or not files:
         abort(500, "Database server error.")
+    active_storage_nodes = storage_nodes.find({"is_terminated": False})
+
+    counting_clone = active_storage_nodes.clone()
+    storage_nodes_count = counting_clone.count()
+    if storage_nodes_count != 0:
+        random_index = random.randint(0, storage_nodes_count - 1)
+        storage_node = active_storage_nodes[random_index]
+        check_termination(storage_node, storage_nodes, files)
+
+    uploaded_files = files.find({"done_uploading": True})
+
+    counting_clone = uploaded_files.clone()
+    uploaded_files_count = counting_clone.count()
+    if uploaded_files_count != 0:
+        random_index = random.randint(0, uploaded_files_count - 1)
+        print("Print random index", random_index, uploaded_files_count)
+
+    file = uploaded_files[random_index]
+    check_regeneration(file, storage_nodes, files)
+
+
+def check_regeneration(file, storage_nodes, files):
+    print(file["filename"])
+
+    i = 0
+    # loop on all segments and all shards.
+    for segment in file["segments"]:
+        number_of_active_shards = 0
+        for shard in segment["shards"]:
+            # If shard is not lost check termination for the storage node.
+            if not shard["shard_lost"]:
+                storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+                is_terminated = check_termination(storage_node, storage_nodes, files)
+                # If not terminated increment the number of active shards
+                if not is_terminated:
+                    number_of_active_shards += 1
+        # if the number of active shards is less than minimum data shards needed therefore this segment is lost
+        if number_of_active_shards < segment['k']:
+            print("segment is lost")
+
+        # if the number of extra shards is less than minimum number needed then regenerate this segment.
+        if (number_of_active_shards - segment['k']) <= Configuration.minimum_regeneration_threshold:
+            print("Regenerate")
+            # TODO: Call regeneration for this segment in this file
+            pass
+        else:
+            print("Segment#", i, "Not regenerated")
+        i += 1
+
+
+def check_termination(storage_node, storage_nodes, files):
+    storage_availability = get_availability(storage_node)
+    print(storage_node["username"], ":", storage_availability, "Terminate flag:",
+          storage_availability < Configuration.minimum_availability_threshold)
+    if storage_availability > Configuration.minimum_availability_threshold:
+        return False
+    else:
+        terminate_storage_node(storage_node, storage_nodes, files)
+        return True
+
+
+def terminate_storage_node(storage_node, storage_nodes, files):
     contract_addresses = []
     for active_contract in storage_node["active_contracts"]:
         contract_addresses.append(active_contract["contract_address"])
@@ -364,7 +402,7 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
 
 
 def update_connection_handler(authorized_username, ip_address, port):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
     query = {"username": authorized_username}
