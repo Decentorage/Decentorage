@@ -355,7 +355,7 @@ def file_done_uploading_handler(authorized_username):
     query = {"username": authorized_username, "done_uploading": False}
     new_values = {"$set": {"done_uploading": True}}
     files.update_one(query, new_values)
-
+    # Add storage nodes in the contract.
     return True
 
 
@@ -403,6 +403,102 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
     files.update_one(query, new_values)
 
     return make_response("Successful.", 200)
+
+
+def assign_another_storage_to_shard(authorized_username, shard_id_original):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+
+    query = {"username": authorized_username, "done_uploading": False}
+    file = files.find_one(query)
+    if not file:
+        abort(404, "No file found.")
+
+    storage_nodes = app.database["storage_nodes"]
+    file_segments = file["segments"]
+
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_num = int(shard_id_split[1])
+    shard_num = int(shard_id_split[2])
+
+    storage_nodes_username = []
+    for i, segment in enumerate(file_segments):
+        for j, shard in enumerate(segment['shards']):
+            if i == segment_num:
+                if shard['username'] not in storage_nodes_username:
+                    storage_nodes_username.append(shard['username'])
+                shard_size = shard['shard_size']
+
+    print(storage_nodes_username)
+    available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1},
+                             "username": {"$nin": storage_nodes_username}}
+
+    possible_storage_nodes = storage_nodes.find(available_space_query)
+    counting_clone = possible_storage_nodes.clone()
+    possible_storage_nodes_count = counting_clone.count()
+    if possible_storage_nodes_count == 0:
+        available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1}}
+        possible_storage_nodes = storage_nodes.find(available_space_query)
+        counting_clone = possible_storage_nodes.clone()
+        possible_storage_nodes_count = counting_clone.count()
+
+    retry_count = 10
+    while retry_count > 0:
+        index = random.choice(range(0, possible_storage_nodes_count - 1))
+        shared_authentication_key = ''.join(
+            random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+        storage_node = possible_storage_nodes[index]
+        port = check_connection(storage_node, shard_id_original, shared_authentication_key, shard_size)
+        # connection failed
+        if not port:
+            print("failed to connect")
+            retry_count -= 1
+            continue
+
+        segments = []
+        for i, segment in enumerate(file_segments):
+            segments.append(segment)
+            shards = []
+            for j, shard in enumerate(segment['shards']):
+                if j == shard_num:
+                    old_storage_username = shard["shard_node_username"]
+                    shard["shard_node_username"] = storage_node["username"]
+                    shard["ip_address"] = storage_node["ip_address"]
+                    shard["port"] = storage_node["port"]
+                    shard["shared_authentication_key"] = shared_authentication_key
+                    shard_size = shard['shard_size']
+                    new_shard = shard
+                    shards.append(shard)
+                else:
+                    shards.append(shard)
+            segments["shards"].append(shards)
+
+        # Storage node update
+        new_available_space = storage_node["available_space"] - shard_size
+        new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": file['contract']}}
+        query = {"username": storage_node["username"]}
+        new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
+        storage_nodes.update_one(query, new_values)
+
+        storage_node = storage_nodes.find_one({"username": old_storage_username})
+        # Remove contract from active contracts of old storage node
+        new_available_space = storage_node["available_space"] + shard_size
+        new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": file['contract']}}
+        query = {"username": storage_node["username"]}
+        new_values = {"$set": {"available_space": new_available_space}, "$pull": new_contracts_entry}
+        storage_nodes.update_one(query, new_values)
+        break
+
+    if retry_count != 0:
+        query = {"username": authorized_username, "done_uploading": False}
+        new_values = {"$set": {"segments": segments}}
+        files.update_one(query, new_values)
+        return new_shard
+    else:
+        return None
 
 
 # _________________________________ Contract Handlers _________________________________#
