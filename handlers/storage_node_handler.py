@@ -1,9 +1,9 @@
 import datetime
 import math
+import random
 import flask
 import app
 import web3_library
-import os
 from bson.objectid import ObjectId
 from functools import wraps
 from flask import abort, request
@@ -82,9 +82,97 @@ def heartbeat_handler(authorized_username):
         storage_nodes.update_one(query, new_values)
         return flask.Response(status=200, response="Heartbeat successful.")
 
+
+def random_checks():
+    storage_nodes = app.database["storage_nodes"]
+    files = app.database["files"]
+    if not storage_nodes or not files:
+        abort(500, "Database server error.")
+    active_storage_nodes = storage_nodes.find({"is_terminated": False})
+
+    counting_clone = active_storage_nodes.clone()
+    storage_nodes_count = counting_clone.count()
+    if storage_nodes_count != 0:
+        random_index = random.randint(0, storage_nodes_count - 1)
+        storage_node = active_storage_nodes[random_index]
+        check_termination(storage_node, storage_nodes, files)
+
+    uploaded_files = files.find({"done_uploading": True})
+
+    counting_clone = uploaded_files.clone()
+    uploaded_files_count = counting_clone.count()
+    if uploaded_files_count != 0:
+        random_index = random.randint(0, uploaded_files_count - 1)
+        print("Print random index", random_index, uploaded_files_count)
+
+    file = uploaded_files[random_index]
+    check_regeneration(file, storage_nodes, files)
+
+
+def check_regeneration(file, storage_nodes, files):
+    print(file["filename"])
+
+    i = 0
+    # loop on all segments and all shards.
+    for segment in file["segments"]:
+        number_of_active_shards = 0
+        for shard in segment["shards"]:
+            # If shard is not lost check termination for the storage node.
+            if not shard["shard_lost"]:
+                storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+                is_terminated = check_termination(storage_node, storage_nodes, files)
+                # If not terminated increment the number of active shards
+                if not is_terminated:
+                    number_of_active_shards += 1
+        # if the number of active shards is less than minimum data shards needed therefore this segment is lost
+        if number_of_active_shards < segment['k']:
+            print("segment is lost")
+
+        # if the number of extra shards is less than minimum number needed then regenerate this segment.
+        if (number_of_active_shards - segment['k']) <= Configuration.minimum_regeneration_threshold:
+            print("Regenerate")
+            # TODO: Call regeneration for this segment in this file
+            pass
+        else:
+            print("Segment#", i, "Not regenerated")
+        i += 1
+
+
+def check_termination(storage_node, storage_nodes, files):
+    storage_availability = get_availability(storage_node)
+    print(storage_node["username"], ":", storage_availability, "Terminate flag:",
+          storage_availability < Configuration.minimum_availability_threshold)
+    if storage_availability > Configuration.minimum_availability_threshold:
+        return False
+    else:
+        terminate_storage_node(storage_node, storage_nodes, files)
+        return True
+
+
+def terminate_storage_node(storage_node, storage_nodes, files):
+    contract_addresses = []
+    for active_contract in storage_node["active_contracts"]:
+        contract_addresses.append(active_contract["contract_address"])
+    storage_files = files.find({"contract": {"$in": contract_addresses}})
+    for file in storage_files:
+        segments = file["segments"]
+        for segment_index, segment in enumerate(segments):
+            shards = segment["shards"]
+            for shard_index, shard in enumerate(shards):
+                if shard["shard_node_username"] == storage_node["username"]:
+                    shard["shard_lost"] = True
+                shards[shard_index] = shard
+            segments[segment_index]["shards"] = shards
+        query = {"_id": ObjectId(file["_id"])}
+        new_values = {"$set": {"segments": segments}}
+        files.update_one(query, new_values)
+
+    query = {"username": storage_node["username"]}
+    new_values = {"$set": {"is_terminated": True, "available_space": 0, "active_contracts": []}}
+    storage_nodes.update_one(query, new_values)
+
+
 # _________________________________ Registrations _________________________________#
-
-
 def add_storage(username, password, wallet_address, available_space):
     extra_info = {'wallet_address': wallet_address, 'available_space': available_space}
     return registration_add_user(username, password, "storage", extra_info)
@@ -125,9 +213,34 @@ def authorize_storage(f):
         if not verify_storage(user['username'], user['password']):
             abort(401, 'No authorized user found.')
 
+        if is_terminated_storage(user["username"]):
+            abort(401, 'Storage is terminated.')
+
         return f(authorized_username=user['username'], *args, **kwargs)
 
     return decorated
+
+
+def is_terminated_storage(username):
+    """
+    Check if storage is terminated.
+    *Parameters:*
+        - *username(string)*: holds the value of the username.
+    *Returns:*
+        -*True*: if the user is terminated.
+        -*False*: if the user is not terminated.
+    """
+    try:
+        users = app.database["storage_nodes"]
+        query = {"username": username, "is_terminated": False}
+        user = users.find_one(query)
+        # Storage doesn't exit
+        if not user:
+            return True
+        else:
+            return False
+    except:
+        return True
 
 # _________________________________ Withdraw handler functions _________________________________#
 
@@ -137,25 +250,40 @@ def get_percentage(heartbeats, full_heartbeats):
     return max(min(100, percentage), 0)
 
 
+def get_active_contracts(authorized_username):
+    storage_nodes = get_storage_nodes_collection()
+    if not storage_nodes:
+        abort(500, 'Database server error.')
+    query = {"username": authorized_username}
+    storage_node = storage_nodes.find_one(query)
+
+    active_shards = []
+    active_contracts = storage_node["active_contracts"]
+    for contract in active_contracts:
+        active_shards.append(contract["shard_id"])
+    return active_shards
+
+
 def get_availability(storage_node):
     last_heartbeat = storage_node["last_heartbeat"]
     heartbeats = storage_node["heartbeats"]
-    if heartbeats == 0:     # New node
-        return 0
+    if last_heartbeat == -1:     # New node
+        return 100
     now = datetime.datetime.utcnow()
     years_since_epoch = now.year - decentorage_epoch.year
     months_since_epoch = now.month - decentorage_epoch.month
     last_interval_start_datetime = get_last_interval_start_datetime(now, years_since_epoch, months_since_epoch)
-    if (last_interval_start_datetime - now) < datetime.timedelta(days=1):
+    if (now - last_interval_start_datetime) < datetime.timedelta(days=1):
         return 100
     next_interval_start_datetime = get_next_interval_start_datetime(now, years_since_epoch, months_since_epoch)
     full_availability_heartbeats = math.ceil((now - last_interval_start_datetime)/datetime.timedelta(minutes=10))
+
     if full_availability_heartbeats == 0:
         return 100
     
-    heartbeats += 1 # Taking current slot into account
+    heartbeats += 1     # Taking current slot into account
     availability = get_percentage(heartbeats, full_availability_heartbeats)
-    if last_heartbeat == -2: # transition state
+    if last_heartbeat == -2:    # transition state
         # First slot in new interval
         if now - last_interval_start_datetime <= datetime.timedelta(minutes=interheartbeat_minutes):
             return 100
@@ -165,8 +293,6 @@ def get_availability(storage_node):
         # new interval but not first slot
         else:
             return 0
-    elif last_heartbeat == -1:  # New node
-        return 0
     else:
         return availability
 
@@ -187,10 +313,10 @@ def storage_node_address_with_contract_nodes(contract, storage_address):
 
 # TODO: the function not tested yet should be tested later
 def withdraw_handler(authorized_username, shard_id):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
-    query = {"username": authorized_username}
+    query = {"username": authorized_username, "is_terminated": False}
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
     if storage_node:
@@ -290,7 +416,7 @@ def test_contract_handler(pay_limit, contract_address, storage_address):
 
 
 def update_connection_handler(authorized_username, ip_address, port):
-    storage_nodes  = get_storage_nodes_collection()
+    storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, 'Database server error.')
     query = {"username": authorized_username}

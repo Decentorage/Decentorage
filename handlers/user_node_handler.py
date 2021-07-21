@@ -1,5 +1,4 @@
 import socket
-
 from flask.helpers import make_response
 from flask.json import jsonify
 import app
@@ -7,14 +6,13 @@ import json
 import jwt
 from flask import abort, request
 from functools import wraps
-
 import web3_library
 from utils import registration_verify_user, registration_add_user
 import random
 import string
 
 
-# _________________________________ PLACEHOLDER _________________________________#
+# _________________________________ PLACEHOLDER _________________________________ #
 def get_user_active_contracts(username):
     """
         get user active contracts
@@ -256,7 +254,7 @@ def pay_contract_handler(authorized_username):
         total_shards = segment["m"]
         unassigned_shards = total_shards
         shard_size = segment["shard_size"]
-        available_space_query = {"available_space": {"$gt": shard_size}}
+        available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1}}
         retry_count = 100
         print("--------------START2--------------")
         while unassigned_shards > 0 and retry_count > 0:
@@ -349,7 +347,168 @@ def calculate_price(download_count, duration_in_months, file_size):
     return price*1000000000000000000
 
 
+def file_done_uploading_handler(authorized_username):
+    files = app.database["files"]
+    users = app.database["user_nodes"]
+    if not files or not users:
+        return False
+
+    # Update user state
+    query = {"username": authorized_username}
+    new_values = {"$set": {"pending_contract": False, "pending_contract_paid": False}}
+    users.update_one(query, new_values)
+
+    # Update file to done uploading
+    query = {"username": authorized_username, "done_uploading": False}
+    new_values = {"$set": {"done_uploading": True}}
+    files.update_one(query, new_values)
+    # Add storage nodes in the contract.
+    return True
+
+
+def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+    if not audits or not shard_id_original:
+        abort(400, "Invalid json object")
+    query = {"username": authorized_username, "done_uploading": False}
+    file = files.find_one(query)
+    if not file:
+        abort(404, "File not found.")
+
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_no = int(shard_id_split[1])
+    shard_no = int(shard_id_split[2])
+    segments = file["segments"]
+    segment = segments[segment_no]
+    shards = segment["shards"]
+    shard = shards[shard_no]
+    if shard["shard_id"] != shard_id_original:
+        abort(500, "Database error.")
+    done_uploading = shard["storage_node_done"]
+    if done_uploading:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".done_uploading": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".user_node_done": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
+                }
+        }
+    else:
+        new_values = {
+            "$set":
+                {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".user_node_done": True,
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
+                }
+        }
+    files.update_one(query, new_values)
+
+    return make_response("Successful.", 200)
+
+
+def assign_another_storage_to_shard(authorized_username, shard_id_original):
+    files = app.database["files"]
+    if not files:
+        abort(500, "Database error.")
+
+    query = {"username": authorized_username, "done_uploading": False}
+    file = files.find_one(query)
+    if not file:
+        abort(404, "No file found.")
+
+    storage_nodes = app.database["storage_nodes"]
+    file_segments = file["segments"]
+
+    shard_id = shard_id_original.encode('utf-8')
+    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_num = int(shard_id_split[1])
+    shard_num = int(shard_id_split[2])
+
+    storage_nodes_username = []
+    for i, segment in enumerate(file_segments):
+        for j, shard in enumerate(segment['shards']):
+            if i == segment_num:
+                if shard['username'] not in storage_nodes_username:
+                    storage_nodes_username.append(shard['username'])
+                shard_size = shard['shard_size']
+
+    print(storage_nodes_username)
+    available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1},
+                             "username": {"$nin": storage_nodes_username}}
+
+    possible_storage_nodes = storage_nodes.find(available_space_query)
+    counting_clone = possible_storage_nodes.clone()
+    possible_storage_nodes_count = counting_clone.count()
+    if possible_storage_nodes_count == 0:
+        available_space_query = {"available_space": {"$gt": shard_size}, "last_heartbeat": {"$ne": -1}}
+        possible_storage_nodes = storage_nodes.find(available_space_query)
+        counting_clone = possible_storage_nodes.clone()
+        possible_storage_nodes_count = counting_clone.count()
+
+    retry_count = 10
+    while retry_count > 0:
+        index = random.choice(range(0, possible_storage_nodes_count - 1))
+        shared_authentication_key = ''.join(
+            random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+        storage_node = possible_storage_nodes[index]
+        port = check_connection(storage_node, shard_id_original, shared_authentication_key, shard_size)
+        # connection failed
+        if not port:
+            print("failed to connect")
+            retry_count -= 1
+            continue
+
+        segments = []
+        for i, segment in enumerate(file_segments):
+            segments.append(segment)
+            shards = []
+            for j, shard in enumerate(segment['shards']):
+                if j == shard_num:
+                    old_storage_username = shard["shard_node_username"]
+                    shard["shard_node_username"] = storage_node["username"]
+                    shard["ip_address"] = storage_node["ip_address"]
+                    shard["port"] = storage_node["port"]
+                    shard["shared_authentication_key"] = shared_authentication_key
+                    shard_size = shard['shard_size']
+                    new_shard = shard
+                    shards.append(shard)
+                else:
+                    shards.append(shard)
+            segments["shards"].append(shards)
+
+        # Storage node update
+        new_available_space = storage_node["available_space"] - shard_size
+        new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": file['contract']}}
+        query = {"username": storage_node["username"]}
+        new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
+        storage_nodes.update_one(query, new_values)
+
+        storage_node = storage_nodes.find_one({"username": old_storage_username})
+        # Remove contract from active contracts of old storage node
+        new_available_space = storage_node["available_space"] + shard_size
+        new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": file['contract']}}
+        query = {"username": storage_node["username"]}
+        new_values = {"$set": {"available_space": new_available_space}, "$pull": new_contracts_entry}
+        storage_nodes.update_one(query, new_values)
+        break
+
+    if retry_count != 0:
+        query = {"username": authorized_username, "done_uploading": False}
+        new_values = {"$set": {"segments": segments}}
+        files.update_one(query, new_values)
+        return new_shard
+    else:
+        return None
+
+
 # _________________________________ Contract Handlers _________________________________#
+# TODO create a function to decrement download_count when file download ends
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -360,6 +519,29 @@ def get_contract_handler(authorized_username):
         abort(404, "No unpaid contracts")
     response = {"contract_address": file["contract"], "filename": file["filename"], "price": file["price"]}
     return make_response(jsonify(response), 200)
+
+
+def verify_transaction_handler(authorized_username, transaction):
+    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    if not hash_receipt:
+        return make_response("transaction has not been mined", 405)
+    else:
+        transactions = app.database["transactions"]
+        if not transactions:
+            abort(500, "Database error.")
+        else:
+            transaction_object = transactions.find_one({'transaction': transaction})
+            if transaction_object:
+                return make_response("transaction already used", 409)
+            else:
+                transactions.insert_one({'transaction': transaction})
+                users = app.database["user_nodes"]
+                if not users:
+                    abort(500, "Database error.")
+                query = {"username": authorized_username}
+                new_values = {"$inc": {"seeds": 1}}
+                users.update_one(query, new_values)
+                return make_response("seeds has incremented", 200)
 
 
 # _________________________________ Download Handlers _________________________________#
@@ -377,7 +559,7 @@ def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authenti
         client_socket = socket.socket()
         print(ip_address)
         print(decentorage_port)
-        client_socket.connect((ip_address, decentorage_port))
+        client_socket.connect((ip_address, int(decentorage_port)))
         print("connected")
         client_socket.sendall(req)
         print("send request")
@@ -419,7 +601,7 @@ def start_download_handler(authorized_username, filename):
             if shard["shard_lost"]:
                 continue
             # TODO try to open a port on storage_node to receive data
-            query = {"username":shard["shard_node_username"]}
+            query = {"username": shard["shard_node_username"]}
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]
             decentorage_port = storage_node["port"]
@@ -438,8 +620,9 @@ def start_download_handler(authorized_username, filename):
             shard_no = shard_id_split[2]
             if int(segment_no) != seg_no or int(shard_no) != sh_no:
                 abort(500, "Database error.")
-            shards_to_return.append({"ip_address":ip_address, "port": port, "segment_no": segment_no,
-                                     "shard_no": shard_no, "auth": shared_authentication_key})
+            shards_to_return.append({"ip_address": ip_address, "port": port, "segment_no": segment_no,
+                                     "shard_id": shard["shard_id"], "shard_no": shard_no,
+                                     "auth": shared_authentication_key})
             shards_acquired += 1
 
         if shards_acquired < total_shards_needed:
@@ -448,80 +631,6 @@ def start_download_handler(authorized_username, filename):
                 abort(424, "File is temporary unavailable")
             else:
                 abort(500, "File is lost.")
-        segments_to_return.append(shards_to_return)
-    return make_response(jsonify({'segments': segments_to_return},200))
-
-    # TODO create a function to decrement doownload_count when file download ends
-
-
-def file_done_uploading_handler():
-    pass
-
-
-def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
-    files = app.database["files"]
-    if not files:
-        abort(500, "Database error.")
-    if not audits or not shard_id_original:
-        abort(400, "Invalid json object")
-    query = {"username": authorized_username, "done_uploading": False}
-    print()
-    file = files.find_one(query)
-    if not file:
-        abort(404, "File not found.")
- 
-    shard_id = shard_id_original.encode('utf-8')
-    shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-    shard_id_split = shard_id.split("$DCNTRG$")
-    segment_no = int(shard_id_split[1])
-    shard_no = int(shard_id_split[2])
-    segments = file["segments"]
-    segment = segments[segment_no]
-    shards = segment["shards"]
-    shard = shards[shard_no]
-    if shard["shard_id"] != shard_id_original:
-        abort(500, "Database error.")
-    done_uploading = shard["storage_node_done"]
-    if done_uploading:
-        new_values = {
-                    "$set": 
-                    {
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".done_uploading": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
-                    }
-                }
-    else:
-        new_values = {
-                    "$set": 
-                    {
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".user_node_done": True,
-                        "segments."+str(segment_no)+".shards."+str(shard_no)+".audits": audits,
-                    }
-                }
-    files.update_one(query, new_values)
-
-    return make_response("Sucessfull.", 200)
-
-
-def verify_transaction_handler(authorized_username, transaction):
-    hash_receipt = web3_library.w3.eth.get_transaction_receipt(transaction)
-    if not hash_receipt:
-        return make_response("transaction has not been mined", 405)
-    else:
-        transactions = app.database["transactions"]
-        if not transactions:
-            abort(500, "Database error.")
-        else:
-            transaction_object = transactions.find_one({'transaction': transaction})
-            if transaction_object:
-                return make_response("transaction already used", 409)
-            else:
-                transactions.insert_one({'transaction': transaction})
-                users = app.database["user_nodes"]
-                if not users:
-                    abort(500, "Database error.")
-                query = {"username": authorized_username}
-                new_values = {"$inc": {"seeds": 1}}
-                users.update_one(query, new_values)
-                return make_response("seeds has incremented", 200)
+        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
+                                   "shard_size": segment["shard_size"]})
+    return make_response(jsonify({'segments': segments_to_return}), 200)

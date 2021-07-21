@@ -24,7 +24,7 @@ def create_contract(payment_limit = 499):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = pay_contract_to_deploy.constructor(int(payment_limit)).buildTransaction({
         'gas': 10000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -44,7 +44,7 @@ def pay_storage_node(contract, storage_address, payment):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.payStorageNode(storage_address, payment).buildTransaction({
         'gas': 1000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -58,7 +58,7 @@ def add_node(contract, storage_address):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.addStorageNode(storage_address).buildTransaction({
         'gas': 1000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -73,7 +73,7 @@ def delete_node(contract, storage_address):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.deleteStorageNode(storage_address).buildTransaction({
         'gas': 1000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -88,7 +88,7 @@ def swap_nodes(contract, storage_address, index):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.swapStorageNode(storage_address, index).buildTransaction({
         'gas': 1000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -102,7 +102,7 @@ def terminate(contract):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.terminate().buildTransaction({
         'gas': 1000000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'nonce': nonce
     })
@@ -133,7 +133,7 @@ def user_pay(contract):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
     transaction = contract.functions.userPay().buildTransaction({
         'gas': 100000,
-        'gasPrice': w3.toWei('60', 'gwei'),
+        'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
         'value': 500,
         'nonce': nonce

@@ -1,6 +1,7 @@
 from flask import make_response, jsonify
 from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler,\
-    get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler
+    get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler, \
+    random_checks, get_active_contracts
 from utils import create_token
 from flask import request
 import re
@@ -43,9 +44,14 @@ def storage_signin():
             else:
                 return make_response("wrong password or username", 403)
         else:
-            return make_response("missing parameters", 400)
+            return make_response("missing values", 400)
     except:
         return make_response("missing parameters", 400)
+
+
+def test():
+    random_checks()
+    return make_response("success", 200)
 
 
 @authorize_storage
@@ -56,6 +62,10 @@ def withdraw(authorized_username):
     else:
         return "shard id is missing from request body"
 
+
+@authorize_storage
+def active_contracts(authorized_username):
+    return get_active_contracts(authorized_username)
 
 @authorize_storage
 def get_availability(authorized_username):
@@ -99,7 +109,6 @@ def storage_shard_done_uploading(authorized_username):
         shard_id = request.json["shard_id"]
         if not shard_id:
             return make_response("missing values.", 400)
-        print(request.json["shard_id"])
         is_success = storage_shard_done_uploading_handler(shard_id)
         if is_success:
             return make_response("success", 200)

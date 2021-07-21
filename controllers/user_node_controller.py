@@ -1,7 +1,8 @@
 from flask import request, jsonify, make_response
 from handlers import add_user, verify_user, authorize_user, get_user_active_contracts, get_user_state,\
     create_file_handler, get_file_info_handler, pay_contract_handler, calculate_price, start_download_handler,\
-        get_contract_handler, file_done_uploading_handler, user_shard_done_uploading_handler, verify_transaction_handler
+    get_contract_handler, file_done_uploading_handler, user_shard_done_uploading_handler, verify_transaction_handler, \
+    assign_another_storage_to_shard
 from utils import create_token
 import json
 import os
@@ -101,18 +102,41 @@ def get_contract(authorized_username):
     return get_contract_handler(authorized_username)
 
 
-@authorize_user     # TODO
+@authorize_user
 def file_done_uploading(authorized_username):
-    pass
+    print("File done uploading")
+    response = file_done_uploading_handler(authorized_username)
+    if response:
+        return make_response("success", 200)
+    else:
+        return make_response("Database error", 500)
 
 
 @authorize_user
 def user_shard_done_uploading(authorized_username):
-    shard_id = request.json["shard_id"]
-    audits = request.json["audits"]
-    if not audits or not shard_id:
-        return make_response("Invalid json object.", 400)
-    return user_shard_done_uploading_handler(authorized_username, shard_id, audits)
+    try:
+        shard_id = request.json["shard_id"]
+        audits = request.json["audits"]
+    except:
+        return make_response("missing parameters", 400)
+    finally:
+        if not audits or not shard_id:
+            return make_response("missing values.", 400)
+        return user_shard_done_uploading_handler(authorized_username, shard_id, audits)
+
+
+@authorize_user
+def user_shard_failed_uploading(authorized_username):
+    try:
+        shard_id = request.json["shard_id"]
+    except:
+        return make_response("missing parameters", 400)
+    finally:
+        if not shard_id:
+            return make_response("missing values.", 400)
+        else:
+            new_connection = assign_another_storage_to_shard(authorize_user, shard_id)
+            return make_response(jsonify(new_connection), 200)
 
 
 @authorize_user
