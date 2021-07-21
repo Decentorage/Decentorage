@@ -1,7 +1,7 @@
 from flask import make_response, jsonify
 from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler,\
     get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler, \
-    random_checks
+    random_checks, get_active_contracts
 from utils import create_token
 from flask import request
 import re
@@ -63,6 +63,10 @@ def withdraw(authorized_username):
     else:
         return "shard id is missing from request body"
 
+
+@authorize_storage
+def active_contracts(authorized_username):
+    return get_active_contracts(authorized_username)
 
 @authorize_storage
 def get_availability(authorized_username):

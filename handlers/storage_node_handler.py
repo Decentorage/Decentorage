@@ -250,6 +250,20 @@ def get_percentage(heartbeats, full_heartbeats):
     return max(min(100, percentage), 0)
 
 
+def get_active_contracts(authorized_username):
+    storage_nodes = get_storage_nodes_collection()
+    if not storage_nodes:
+        abort(500, 'Database server error.')
+    query = {"username": authorized_username}
+    storage_node = storage_nodes.find_one(query)
+
+    active_shards = []
+    active_contracts = storage_node["active_contracts"]
+    for contract in active_contracts:
+        active_shards.append(contract["shard_id"])
+    return active_shards
+
+
 def get_availability(storage_node):
     last_heartbeat = storage_node["last_heartbeat"]
     heartbeats = storage_node["heartbeats"]
