@@ -366,7 +366,6 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
     if not audits or not shard_id_original:
         abort(400, "Invalid json object")
     query = {"username": authorized_username, "done_uploading": False}
-    print()
     file = files.find_one(query)
     if not file:
         abort(404, "File not found.")
@@ -625,5 +624,6 @@ def start_download_handler(authorized_username, filename):
                 abort(424, "File is temporary unavailable")
             else:
                 abort(500, "File is lost.")
-        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"]})
+        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
+                                   "shard_size": segment["shard_size"]})
     return make_response(jsonify({'segments': segments_to_return}), 200)

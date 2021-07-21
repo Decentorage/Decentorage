@@ -29,3 +29,4 @@ def add_user_urls():
     # TODO: Regeneration check the threshold and swap in smart contract and database.
     # TODO: Shard failed to upload swap, add to the contract if done uploading.
     # TODO: Download done
+    # TODO: check time constaint in storage withdraw

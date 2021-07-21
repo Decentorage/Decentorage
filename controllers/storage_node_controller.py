@@ -34,7 +34,6 @@ def storage_signup():
 
 def storage_signin():
     try:
-        print(request.json)
         username = request.json["username"]
         password = request.json["password"]
         if username and password:
@@ -110,7 +109,6 @@ def storage_shard_done_uploading(authorized_username):
         shard_id = request.json["shard_id"]
         if not shard_id:
             return make_response("missing values.", 400)
-        print(request.json["shard_id"])
         is_success = storage_shard_done_uploading_handler(shard_id)
         if is_success:
             return make_response("success", 200)
