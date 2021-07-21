@@ -24,11 +24,19 @@ def get_user_active_contracts(username):
            - List of active contracts of a specific user.
     """
     try:
-        users = app.database["user_nodes"]
-        query = {"username": username}
-        user = users.find_one(query)
-        if user['active_contracts']:
-            return user['active_contracts']
+        files = app.database["files"]
+        query = {"username": username, "done_uploading": True}
+        user_files = files.find(query)
+        if user_files:
+            result = []
+            for user_file in user_files:
+                result.append({
+                    "filename": user_file["filename"],
+                    "size": user_file["file_size"],
+                    "download_count": user_file["download_count"],
+                    "duration_in_months": user_file["duration_in_months"]
+                })
+            return result
         else:
             return []
     except:
@@ -266,7 +274,6 @@ def pay_contract_handler(authorized_username):
             size_unused = len(unused_possible_storage_nodes_indices)
             index_unused = 0
 
-
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
             for j, index in enumerate(unordered_possible_storage_nodes_indices):
                 print("--------------START4--------------")
@@ -340,8 +347,9 @@ def calculate_price(download_count, duration_in_months, file_size):
         price = 0.25
     # to convert to wei
     return price*1000000000000000000
-# _________________________________ Contract Handlers _________________________________#
 
+
+# _________________________________ Contract Handlers _________________________________#
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -350,13 +358,38 @@ def get_contract_handler(authorized_username):
     file = files.find_one(query)    
     if not file:
         abort(404, "No unpaid contracts")
-    response = {"contract_addresss":file["contract"], "filename": file["filename"], "price": file["price"]}
+    response = {"contract_address": file["contract"], "filename": file["filename"], "price": file["price"]}
     return make_response(jsonify(response), 200)
 
-# _________________________________ Download Handlers _________________________________#
 
-def get_port():
-    return 50505 # TODO
+# _________________________________ Download Handlers _________________________________#
+def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authentication_key):
+    port = 0
+    req = {'type': 'download',
+           'port': 0,
+           'shard_id': shard_id,
+           'auth': shared_authentication_key,
+           'size': shard_size}
+
+    req = json.dumps(req).encode('utf-8')
+    try:
+        # start tcp connection with storage node
+        client_socket = socket.socket()
+        print(ip_address)
+        print(decentorage_port)
+        client_socket.connect((ip_address, decentorage_port))
+        print("connected")
+        client_socket.sendall(req)
+        print("send request")
+        port = int(client_socket.recv(1024).decode("utf-8"))
+        print("received")
+        return port
+
+    except socket.error:
+        print("disconnected")
+        return port
+
+    client_socket.close()
 
 
 def start_download_handler(authorized_username, filename):
@@ -390,7 +423,9 @@ def start_download_handler(authorized_username, filename):
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]
             decentorage_port = storage_node["port"]
-            port = get_port()
+            shared_authentication_key = ''.join(
+                random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
+            port = get_port(ip_address, decentorage_port, shard["shard_id"], segment["shard_size"], shared_authentication_key)
             if port == 0:
                 temporarily_inactive += 1
                 continue
@@ -398,12 +433,13 @@ def start_download_handler(authorized_username, filename):
             shard_id = shard["shard_id"]
             shard_id = shard_id.encode('utf-8')
             shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-            shard_id_splitted = shard_id.split("$DCNTRG$")
-            segment_no = shard_id_splitted[1]
-            shard_no = shard_id_splitted[2]
+            shard_id_split = shard_id.split("$DCNTRG$")
+            segment_no = shard_id_split[1]
+            shard_no = shard_id_split[2]
             if int(segment_no) != seg_no or int(shard_no) != sh_no:
                 abort(500, "Database error.")
-            shards_to_return.append({"ip_address":ip_address, "port":port, "segment_no": segment_no, "shard_no": shard_no})
+            shards_to_return.append({"ip_address":ip_address, "port": port, "segment_no": segment_no,
+                                     "shard_no": shard_no, "auth": shared_authentication_key})
             shards_acquired += 1
 
         if shards_acquired < total_shards_needed:
@@ -417,10 +453,12 @@ def start_download_handler(authorized_username, filename):
 
     # TODO create a function to decrement doownload_count when file download ends
 
+
 def file_done_uploading_handler():
     pass
 
-def shard_done_uploading_handler(authorized_username, shard_id_original, audits):
+
+def user_shard_done_uploading_handler(authorized_username, shard_id_original, audits):
     files = app.database["files"]
     if not files:
         abort(500, "Database error.")
@@ -434,9 +472,9 @@ def shard_done_uploading_handler(authorized_username, shard_id_original, audits)
  
     shard_id = shard_id_original.encode('utf-8')
     shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
-    shard_id_splitted = shard_id.split("$DCNTRG$")
-    segment_no = int(shard_id_splitted[1])
-    shard_no = int(shard_id_splitted[2])
+    shard_id_split = shard_id.split("$DCNTRG$")
+    segment_no = int(shard_id_split[1])
+    shard_no = int(shard_id_split[2])
     segments = file["segments"]
     segment = segments[segment_no]
     shards = segment["shards"]
