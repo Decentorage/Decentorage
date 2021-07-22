@@ -65,7 +65,8 @@ def withdraw(authorized_username):
 
 @authorize_storage
 def active_contracts(authorized_username):
-    return get_active_contracts(authorized_username)
+    shards = get_active_contracts(authorized_username)
+    return make_response(jsonify({'shards': shards}), 200)
 
 @authorize_storage
 def get_availability(authorized_username):
