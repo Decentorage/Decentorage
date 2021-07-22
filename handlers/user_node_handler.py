@@ -239,6 +239,8 @@ def pay_contract_handler(authorized_username):
     file_price = file["price"]
     payment_contract = web3_library.get_contract(contract)
     payment_contract_balance = web3_library.get_balance(payment_contract)
+    print(payment_contract_balance)
+    print(file_price)
     if payment_contract_balance >= file_price:
         paid = True
     else:
@@ -522,7 +524,7 @@ def get_contract_handler(authorized_username):
 
 
 def verify_transaction_handler(authorized_username, transaction):
-    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    hash_receipt = web3_library.w3.eth.get_transaction_receipt(transaction)
     if not hash_receipt:
         return make_response("transaction has not been mined", 405)
     else:
