@@ -332,17 +332,18 @@ def pay_contract_handler(authorized_username):
 
 
 def calculate_price(download_count, duration_in_months, file_size):
-    # one ether = 41 dollars
-    # one tera storage for 3 dollars
-    # price_per_kb = 3 in ether / tera
-    price_per_kb = 0.07317 / 1099511627776
-    # price per download 7 dollars = 0.12195122 in ether
-    price_per_download = 0.12195122
-    # price per month  = 1 dollar = 0.024390244 in ether
-    price_per_month = 0.024390244
-    price = price_per_kb * file_size + price_per_month * duration_in_months + price_per_download * download_count
-    if price < 0.25:
-        price = 0.25
+    # Assuming one ether = 10000 dollars
+    ether_in_usd = 10000
+    # One tera storage for 3 dollars
+    storage_price_per_tera = 3 / ether_in_usd
+    storage_price_per_kb = storage_price_per_tera / 1073741824
+    # One tera download for 7 dollars
+    download_price_per_tera = 7 / ether_in_usd
+    download_price_per_kb = download_price_per_tera / 1073741824
+
+    # Price calculation
+    price = storage_price_per_kb * file_size * duration_in_months + download_price_per_kb * file_size * download_count
+
     # to convert to wei
     return price*1000000000000000000
 
