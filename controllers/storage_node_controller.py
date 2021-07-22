@@ -51,7 +51,8 @@ def storage_signin():
 
 
 def test():
-    random_checks()
+    # random_checks()
+    start_regeneration_job(1, 1, True)
     return make_response("success", 200)
 
 

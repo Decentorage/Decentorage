@@ -1,6 +1,7 @@
 import datetime
 import math
 import random
+from utils import start_regeneration_job
 import flask
 import app
 import web3_library
@@ -111,10 +112,10 @@ def random_checks():
 
 def check_regeneration(file, storage_nodes, files):
     print(file["filename"])
-
+    id = file["_id"]
     i = 0
     # loop on all segments and all shards.
-    for segment in file["segments"]:
+    for seg_no, segment in enumerate(file["segments"]):
         number_of_active_shards = 0
         for shard in segment["shards"]:
             # If shard is not lost check termination for the storage node.
@@ -131,8 +132,7 @@ def check_regeneration(file, storage_nodes, files):
         # if the number of extra shards is less than minimum number needed then regenerate this segment.
         if (number_of_active_shards - segment['k']) <= Configuration.minimum_regeneration_threshold:
             print("Regenerate")
-            # TODO: Call regeneration for this segment in this file
-            pass
+            start_regeneration_job(id, seg_no)
         else:
             print("Segment#", i, "Not regenerated")
         i += 1
