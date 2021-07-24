@@ -108,7 +108,7 @@ def random_checks():
         random_index = random.randint(0, uploaded_files_count - 1)
         print("Print random index", random_index, uploaded_files_count)
 
-    file = uploaded_files[random_index]
+    file = uploaded_files[3]  # random_index
     check_regeneration(file, storage_nodes, files)
 
 
@@ -138,7 +138,6 @@ def send_audit(shard, ip_address, port):
 
 def check_regeneration(file, storage_nodes, files):
     print(file["filename"])
-
     i = 0
     # loop on all segments and all shards.
     for segment in file["segments"]:
@@ -147,11 +146,16 @@ def check_regeneration(file, storage_nodes, files):
             # If shard is not lost check termination for the storage node.
             if not shard["shard_lost"]:
                 storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
-                send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
                 is_terminated = check_termination(storage_node, storage_nodes, files)
                 # If not terminated increment the number of active shards
                 if not is_terminated:
-                    number_of_active_shards += 1
+                    audit_passed = send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
+                    if not audit_passed:
+                        print("audits didn't pass.")
+                        terminate_storage_node(storage_node, storage_nodes, files)
+                    else:
+                        print("audits passed.")
+                        number_of_active_shards += 1
         # if the number of active shards is less than minimum data shards needed therefore this segment is lost
         if number_of_active_shards < segment['k']:
             print("segment is lost")
