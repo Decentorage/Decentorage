@@ -125,7 +125,7 @@ def send_audit(shard, ip_address, port):
     try:
         # start tcp connection with storage node
         client_socket = socket.socket()
-        client_socket.settimeout(5)
+        client_socket.settimeout(2)
         client_socket.connect((ip_address, port))
         client_socket.sendall(req)
         result = client_socket.recv(1024).decode("utf-8")
