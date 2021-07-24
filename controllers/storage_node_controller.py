@@ -60,7 +60,7 @@ def withdraw(authorized_username):
     if shard_id:
         return withdraw_handler(authorized_username, shard_id)
     else:
-        return "shard id is missing from request body"
+        return make_response("shard id is missing from request body", 400)
 
 
 @authorize_storage

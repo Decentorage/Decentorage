@@ -13,3 +13,7 @@ class Configuration:
 	minimum_availability_threshold = 70
 	# Minimum regeneration threshold.
 	minimum_regeneration_threshold = 0
+	# Storage nodes share
+	storage_node_share = 0.75
+	# full payment threshold
+	full_payment_threshold = 0.95
