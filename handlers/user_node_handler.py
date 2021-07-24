@@ -1,3 +1,4 @@
+import datetime
 import socket
 from flask.helpers import make_response
 from flask.json import jsonify
@@ -250,6 +251,14 @@ def pay_contract_handler(authorized_username):
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
+    # calculate next payment date for storage nodes, how much payment left, and payment per week.
+    now = datetime.datetime.utcnow()
+    next_payment_date = now + datetime.timedelta(minutes=5)             # datetime.timedelta(days=7)
+    total_number_of_shards = 0
+    for segment in segments:
+        total_number_of_shards += segment['m']
+    payment_left = file['price'] / total_number_of_shards
+    payment_per_week = payment_left / 4                                 # (file['duration_in_months'] * 4)
 
     print("--------------START--------------")
     for i, segment in enumerate(segments):
@@ -307,7 +316,13 @@ def pay_contract_handler(authorized_username):
                 ip_address = current_storage_node["ip_address"]
 
                 new_available_space = current_storage_node["available_space"] - shard_size
-                new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": contract}}
+                new_contracts_entry = {'active_contracts': {
+                    "shard_id": shard_id,
+                    "contract_address": contract,
+                    "next_payment_date": next_payment_date,
+                    "payment_left": payment_left,
+                    "payment_per_week": payment_per_week
+                }}
                 query = {"username": storage_node_username}
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
                 storage_nodes.update_one(query, new_values)
