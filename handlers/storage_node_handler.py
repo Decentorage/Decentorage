@@ -1,8 +1,11 @@
 import datetime
 import math
 import random
+import socket
+
 import flask
 import app
+import json
 import web3_library
 from bson.objectid import ObjectId
 from functools import wraps
@@ -109,6 +112,30 @@ def random_checks():
     check_regeneration(file, storage_nodes, files)
 
 
+def send_audit(shard, ip_address, port):
+    audits = shard["audits"]
+    audits_number = len(audits)
+    audit_idx = random.randint(0, audits_number - 1)
+    salt = audits[audit_idx]["salt"]
+    audit_hash = audits[audit_idx]["hash"]
+
+    req = {"type": "audit", "salt": salt, "shard_id": shard["shard_id"]}
+    req = json.dumps(req).encode('utf-8')
+
+    try:
+        # start tcp connection with storage node
+        client_socket = socket.socket()
+        client_socket.settimeout(2)
+        client_socket.connect((ip_address, port))
+        client_socket.sendall(req)
+        result = client_socket.recv(1024).decode("utf-8")
+
+        return result == audit_hash
+
+    except socket.error:
+        return False
+
+
 def check_regeneration(file, storage_nodes, files):
     print(file["filename"])
 
@@ -120,6 +147,7 @@ def check_regeneration(file, storage_nodes, files):
             # If shard is not lost check termination for the storage node.
             if not shard["shard_lost"]:
                 storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+                send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
                 is_terminated = check_termination(storage_node, storage_nodes, files)
                 # If not terminated increment the number of active shards
                 if not is_terminated:

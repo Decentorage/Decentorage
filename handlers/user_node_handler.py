@@ -62,6 +62,7 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     try:
         # start tcp connection with storage node
         client_socket = socket.socket()
+        client_socket.settimeout(2)
         print(ip_address)
         print(decentorage_port)
         client_socket.connect((ip_address, decentorage_port))
@@ -585,6 +586,7 @@ def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authenti
         client_socket = socket.socket()
         print(ip_address)
         print(decentorage_port)
+        client_socket.settimeout(2)
         client_socket.connect((ip_address, int(decentorage_port)))
         print("connected")
         client_socket.sendall(req)
