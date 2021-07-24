@@ -147,6 +147,7 @@ def check_regeneration(file, storage_nodes, files):
             # If shard is not lost check termination for the storage node.
             if not shard["shard_lost"]:
                 storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+                send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
                 is_terminated = check_termination(storage_node, storage_nodes, files)
                 # If not terminated increment the number of active shards
                 if not is_terminated:
