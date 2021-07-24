@@ -75,7 +75,6 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     except socket.error:
         print("disconnected")
         return port
-
     client_socket.close()
 
 
@@ -201,6 +200,7 @@ def create_file_handler(authorized_username, new_file):
         segments_list.append({
             "k": segment["k"],
             "m": segment["m"],
+            "regeneration_count": 0,
             "shard_size": segment["shard_size"],
             "shards": shard_list
         })
@@ -417,6 +417,13 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
                 }
         }
+        try:
+            storage_nodes = app.database["storage_nodes"]
+            storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+            contract = web3_library.get_contract(file["contract"])
+            web3_library.add_node(contract, storage_node["wallet_address"])
+        except:
+            print("error in adding storage node to contract")
     else:
         new_values = {
             "$set":
@@ -507,6 +514,7 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
         query = {"username": storage_node["username"]}
         new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
         storage_nodes.update_one(query, new_values)
+        new_wallet_address = storage_node["wallet_address"]
 
         storage_node = storage_nodes.find_one({"username": old_storage_username})
         # Remove contract from active contracts of old storage node
@@ -527,7 +535,6 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
 
 
 # _________________________________ Contract Handlers _________________________________#
-# TODO create a function to decrement download_count when file download ends
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -652,4 +659,9 @@ def start_download_handler(authorized_username, filename):
                 abort(500, "File is lost.")
         segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
                                    "shard_size": segment["shard_size"]})
+        # Decrement downloads
+        query = {"username": authorized_username, "filename": filename}
+        new_values = {"$inc": {"download_count": -1}}
+        files.update_one(query, new_values)
+
     return make_response(jsonify({'segments': segments_to_return}), 200)

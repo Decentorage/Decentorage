@@ -78,7 +78,7 @@ def heartbeat_handler(authorized_username):
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
         else:
             abort(429, 'Heartbeat Ignored')
-        # TODO: Check random storage node availability, New thread.
+
         storage_nodes.update_one(query, new_values)
         return flask.Response(status=200, response="Heartbeat successful.")
 
@@ -498,6 +498,13 @@ def storage_shard_done_uploading_handler(shard_id_original):
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
                 }
         }
+        try:
+            storage_nodes = get_storage_nodes_collection()
+            storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+            contract = web3_library.get_contract(file["contract"])
+            web3_library.add_node(contract, storage_node["wallet_address"])
+        except:
+            print("Storage node not added to contract")
     else:
         new_values = {
             "$set":
