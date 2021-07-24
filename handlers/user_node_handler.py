@@ -11,6 +11,7 @@ import web3_library
 from utils import registration_verify_user, registration_add_user
 import random
 import string
+from utils import Configuration
 
 
 # _________________________________ PLACEHOLDER _________________________________ #
@@ -254,12 +255,13 @@ def pay_contract_handler(authorized_username):
     segments = file["segments"]
     # calculate next payment date for storage nodes, how much payment left, and payment per week.
     now = datetime.datetime.utcnow()
-    next_payment_date = now + datetime.timedelta(minutes=5)             # datetime.timedelta(days=7)
+    next_payment_date = now + datetime.timedelta(minutes=5)             # now + datetime.timedelta(days=7)
     total_number_of_shards = 0
     for segment in segments:
         total_number_of_shards += segment['m']
-    payment_left = file['price'] / total_number_of_shards
-    payment_per_week = payment_left / 4                                 # (file['duration_in_months'] * 4)
+    total_payment = (Configuration.storage_node_share * file['price']) / total_number_of_shards
+    payments_count_left = (file['duration_in_months'] * 4)
+    payment_per_interval = total_payment / payments_count_left
 
     print("--------------START--------------")
     for i, segment in enumerate(segments):
@@ -291,7 +293,6 @@ def pay_contract_handler(authorized_username):
                 shared_authentication_key = ''.join(
                     random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
 
-                # TODO check if node is alive
                 fail = False
                 port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key, shard_size)
                 print("first try", index)
@@ -312,7 +313,7 @@ def pay_contract_handler(authorized_username):
                 # TODO send authentication key, inform storage node, and get portclientSocket = socket.socket()
 
                 # Storage node update
-                current_storage_node = possible_storage_nodes[index]        # ...
+                current_storage_node = possible_storage_nodes[index]
                 storage_node_username = current_storage_node["username"]
                 ip_address = current_storage_node["ip_address"]
 
@@ -321,8 +322,8 @@ def pay_contract_handler(authorized_username):
                     "shard_id": shard_id,
                     "contract_address": contract,
                     "next_payment_date": next_payment_date,
-                    "payment_left": payment_left,
-                    "payment_per_week": payment_per_week
+                    "payments_count_left": payments_count_left,
+                    "payment_per_interval": payment_per_interval
                 }}
                 query = {"username": storage_node_username}
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
@@ -619,7 +620,7 @@ def start_download_handler(authorized_username, filename):
                 break
             if shard["shard_lost"]:
                 continue
-            # TODO try to open a port on storage_node to receive data
+
             query = {"username": shard["shard_node_username"]}
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]

@@ -7,7 +7,7 @@ import app
 import web3_library
 from bson.objectid import ObjectId
 from functools import wraps
-from flask import abort, request
+from flask import abort, request, make_response
 import jwt
 from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
@@ -138,13 +138,15 @@ def check_regeneration(file, storage_nodes, files):
         i += 1
 
 
-def check_termination(storage_node, storage_nodes, files):
+def check_termination(storage_node, storage_nodes, files=None):
     storage_availability = get_availability(storage_node)
-    print(storage_node["username"], ":", storage_availability, "Terminate flag:",
+    print(storage_node["username"], ":", storage_availability, "should be terminated:",
           storage_availability < Configuration.minimum_availability_threshold)
     if storage_availability > Configuration.minimum_availability_threshold:
         return False
     else:
+        if not files:
+            files = app.database['files']
         terminate_storage_node(storage_node, storage_nodes, files)
         return True
 
@@ -297,10 +299,11 @@ def get_availability(storage_node):
         return availability
 
 
-def get_contract_address_from_storage_node(active_contracts, shard_id):
-    for active in active_contracts:
+def get_contract_from_storage_node(active_contracts, shard_id):
+    for index, active in enumerate(active_contracts):
         if active["shard_id"] == shard_id:
-            return active["contract_address"]
+            return active, index
+    return None
 
 
 def storage_node_address_with_contract_nodes(contract, storage_address):
@@ -311,7 +314,6 @@ def storage_node_address_with_contract_nodes(contract, storage_address):
     return False
 
 
-# TODO: the function not tested yet should be tested later
 def withdraw_handler(authorized_username, shard_id):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
@@ -319,22 +321,58 @@ def withdraw_handler(authorized_username, shard_id):
     query = {"username": authorized_username, "is_terminated": False}
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
+
     if storage_node:
-        availability = get_availability(storage_node)   # Availability in percentage [0, 100].
-        # TODO: calculate payment based on availability
-        payment = availability
-        storage_wallet_address = storage_node["wallet_address"]
-        active_contracts = storage_node["active_contracts"]
-        contract_address = get_contract_address_from_storage_node(active_contracts, shard_id)
-        contract = web3_library.get_contract(contract_address)
-        in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
-        # TODO: check for payment date before transfer the money
-        if availability > Configuration.minimum_availability_threshold and in_contract:
-            web3_library.pay_storage_node(contract, storage_wallet_address, payment)
-        else:
-            return "availability is not good enough"
+        is_terminated = check_termination(storage_node, storage_nodes)
+        if not is_terminated:
+            availability = get_availability(storage_node)             # Availability in percentage [0, 100].
+            # if availability above full payment threshold, the storage node get full payment
+            if availability >= Configuration.full_payment_threshold:
+                print("Storage: ", storage_node['username'], "full payment")
+                availability = 100
+            else:
+                print("Storage: ", storage_node['username'], availability, " payment")
+
+            storage_wallet_address = storage_node["wallet_address"]
+            active_contracts = storage_node["active_contracts"]
+            # get contract element from storage active contracts
+            contract, contract_index = get_contract_from_storage_node(active_contracts, shard_id)
+            # read contract details.
+            contract_address = contract['contract_address']
+            payments_count_left = contract['payments_count_left']
+            payment = 0
+            now = datetime.datetime.utcnow()
+            next_payment_date = contract['next_payment_date']
+            withdrawn = False
+            # Calculate the payment amount the storage node will take
+            while (next_payment_date < now) and (payments_count_left > 0):
+                print("withdraw--")
+                payment += availability * contract['payment_per_interval'] / 100
+                payments_count_left -= 1
+                next_payment_date = next_payment_date + datetime.timedelta(minutes=5)
+                withdrawn = True
+            if not withdrawn:
+                return make_response("No payment available now.", 404)
+
+            contract = web3_library.get_contract(contract_address)
+            in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
+            print(availability, Configuration.minimum_availability_threshold, in_contract)
+            if availability > Configuration.minimum_availability_threshold and in_contract:
+                web3_library.pay_storage_node(contract, storage_wallet_address, payment)
+                active_contracts[contract_index] = {
+                    "shard_id": shard_id,
+                    "contract_address": contract_address,
+                    "next_payment_date": next_payment_date,
+                    "payments_count_left": payments_count_left,
+                    "payment_per_interval": contract['payment_per_interval']
+                }
+                query = {"username": authorized_username}
+                new_values = {"$set": {"active_contracts": active_contracts}}
+                storage_nodes.update_one(query, new_values)
+            else:
+                return make_response("availability is not good enough", 400)
     else:
-        return "Database error."
+        return make_response("Database error.", 500)
 
 
 def get_availability_handler(authorized_username):
@@ -477,12 +515,14 @@ def get_storage_info_handler(username):
 
     storage_node = storage_nodes.find_one({"username": username})
     response = []
+    availability = get_availability(storage_node)
     for active_contract in storage_node['active_contracts']:
+        payment_left = availability * active_contract['payment_per_interval'] * \
+                       active_contract['payments_count_left'] / 100
         response.append({
             "shard_id": active_contract['shard_id'],
             "next_payment_date": active_contract['next_payment_date'],
-            "payment_left": active_contract['payment_left'],
-            "payment_per_week": active_contract['payment_per_week']
+            "payment_left": payment_left,
+            "payment_per_interval": active_contract['payment_per_interval']
         })
-    availability = get_availability(storage_node)
     return availability, response
