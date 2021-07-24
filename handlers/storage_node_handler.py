@@ -329,7 +329,7 @@ def withdraw_handler(authorized_username, shard_id):
         contract = web3_library.get_contract(contract_address)
         in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
         # TODO: check for payment date before transfer the money
-        if availability > Configuration.minimum_availability and in_contract:
+        if availability > Configuration.minimum_availability_threshold and in_contract:
             web3_library.pay_storage_node(contract, storage_wallet_address, payment)
         else:
             return "availability is not good enough"
@@ -470,3 +470,19 @@ def storage_shard_done_uploading_handler(shard_id_original):
     # Update file document
     files.update_one(query, new_values)
     return True
+
+
+def get_storage_info_handler(username):
+    storage_nodes = get_storage_nodes_collection()
+
+    storage_node = storage_nodes.find_one({"username": username})
+    response = []
+    for active_contract in storage_node['active_contracts']:
+        response.append({
+            "shard_id": active_contract['shard_id'],
+            "next_payment_date": active_contract['next_payment_date'],
+            "payment_left": active_contract['payment_left'],
+            "payment_per_week": active_contract['payment_per_week']
+        })
+    availability = get_availability(storage_node)
+    return availability, response

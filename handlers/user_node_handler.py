@@ -1,3 +1,4 @@
+import datetime
 import socket
 from flask.helpers import make_response
 from flask.json import jsonify
@@ -31,7 +32,8 @@ def get_user_active_contracts(username):
                 result.append({
                     "filename": user_file["filename"],
                     "size": user_file["file_size"],
-                    "download_count": user_file["download_count"]
+                    "download_count": user_file["download_count"],
+                    "duration_in_months": user_file["duration_in_months"]
                 })
             return result
         else:
@@ -151,7 +153,7 @@ def create_file_handler(authorized_username, new_file):
     filename = new_file['filename']
 
     pay_limit = calculate_price(new_file["download_count"], new_file["duration_in_months"], new_file["file_size"])
-    contract = web3_library.create_contract(pay_limit - 1)
+    contract = web3_library.create_contract(pay_limit - 10)
     files = app.database["files"]
     users = app.database["user_nodes"]
     if not files or not users:
@@ -236,18 +238,28 @@ def pay_contract_handler(authorized_username):
         abort(404, "There is no unpaid file being uploaded.")
 
     contract = file["contract"]
-    # file_price = file["price"]
-    # payment_contract = web3_library.get_contract(contract)
-    # payment_contract_balance = web3_library.get_balance(payment_contract)
-    # if payment_contract_balance >= file_price:
-    #     paid = True
-    # else:
-    #     paid = False
-    # if not paid:
-    #     abort(403, "Contract is not paid yet.")
+    file_price = file["price"]
+    payment_contract = web3_library.get_contract(contract)
+    payment_contract_balance = web3_library.get_balance(payment_contract)
+    print(payment_contract_balance)
+    print(file_price)
+    if payment_contract_balance >= file_price:
+        paid = True
+    else:
+        paid = False
+    if not paid:
+        abort(403, "Contract is not paid yet.")
     
     storage_nodes = app.database["storage_nodes"]
     segments = file["segments"]
+    # calculate next payment date for storage nodes, how much payment left, and payment per week.
+    now = datetime.datetime.utcnow()
+    next_payment_date = now + datetime.timedelta(minutes=5)             # datetime.timedelta(days=7)
+    total_number_of_shards = 0
+    for segment in segments:
+        total_number_of_shards += segment['m']
+    payment_left = file['price'] / total_number_of_shards
+    payment_per_week = payment_left / 4                                 # (file['duration_in_months'] * 4)
 
     print("--------------START--------------")
     for i, segment in enumerate(segments):
@@ -305,7 +317,13 @@ def pay_contract_handler(authorized_username):
                 ip_address = current_storage_node["ip_address"]
 
                 new_available_space = current_storage_node["available_space"] - shard_size
-                new_contracts_entry = {'active_contracts': {"shard_id": shard_id, "contract_address": contract}}
+                new_contracts_entry = {'active_contracts': {
+                    "shard_id": shard_id,
+                    "contract_address": contract,
+                    "next_payment_date": next_payment_date,
+                    "payment_left": payment_left,
+                    "payment_per_week": payment_per_week
+                }}
                 query = {"username": storage_node_username}
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
                 storage_nodes.update_one(query, new_values)
@@ -332,13 +350,20 @@ def pay_contract_handler(authorized_username):
 
 
 def calculate_price(download_count, duration_in_months, file_size):
-    price_per_storage = file_size / 1099511627776
-    price_per_download = price_per_storage * 1.8
-    admin_fees = 0.01 * price_per_storage
-    price = admin_fees + price_per_storage * duration_in_months + price_per_download * download_count
-    if price < 0.25:
-        price = 0.25
-    return price
+    # Assuming one ether = 10000 dollars
+    ether_in_usd = 10000
+    # One tera storage for 3 dollars
+    storage_price_per_tera = 3 / ether_in_usd
+    storage_price_per_kb = storage_price_per_tera / 1073741824
+    # One tera download for 7 dollars
+    download_price_per_tera = 7 / ether_in_usd
+    download_price_per_kb = download_price_per_tera / 1073741824
+
+    # Price calculation
+    price = storage_price_per_kb * file_size * duration_in_months + download_price_per_kb * file_size * download_count
+
+    # to convert to wei
+    return price*1000000000000000000
 
 
 def file_done_uploading_handler(authorized_username):
@@ -367,7 +392,6 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
     if not audits or not shard_id_original:
         abort(400, "Invalid json object")
     query = {"username": authorized_username, "done_uploading": False}
-    print()
     file = files.find_one(query)
     if not file:
         abort(404, "File not found.")
@@ -517,7 +541,7 @@ def get_contract_handler(authorized_username):
 
 
 def verify_transaction_handler(authorized_username, transaction):
-    hash_receipt = web3_library.eth.get_transaction_receipt(hash)
+    hash_receipt = web3_library.w3.eth.get_transaction_receipt(transaction)
     if not hash_receipt:
         return make_response("transaction has not been mined", 405)
     else:
@@ -626,5 +650,6 @@ def start_download_handler(authorized_username, filename):
                 abort(424, "File is temporary unavailable")
             else:
                 abort(500, "File is lost.")
-        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"]})
+        segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
+                                   "shard_size": segment["shard_size"]})
     return make_response(jsonify({'segments': segments_to_return}), 200)

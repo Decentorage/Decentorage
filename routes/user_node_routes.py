@@ -15,7 +15,6 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/getDecentorageWalletAddress", view_func=get_decentorage_wallet_address,
                          methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/getContract", view_func=get_contract, methods=["GET"])
-    app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["GET"])
     app.app.add_url_rule(user_url_prefix + "/fileDoneUploading", view_func=file_done_uploading, methods=["GET"])
 
     # Post Methods
@@ -26,6 +25,8 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/shardDoneUploading", view_func=user_shard_done_uploading, methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/shardFailedUploading", view_func=user_shard_failed_uploading,
                          methods=["POST"])
+    app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["POST"])
     # TODO: Regeneration check the threshold and swap in smart contract and database.
     # TODO: Shard failed to upload swap, add to the contract if done uploading.
     # TODO: Download done
+    # TODO: check time constraint in storage withdraw

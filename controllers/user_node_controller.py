@@ -104,6 +104,7 @@ def get_contract(authorized_username):
 
 @authorize_user
 def file_done_uploading(authorized_username):
+    print("File done uploading")
     response = file_done_uploading_handler(authorized_username)
     if response:
         return make_response("success", 200)
