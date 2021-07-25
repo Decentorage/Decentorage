@@ -50,12 +50,13 @@ def storage_signin():
 
 
 def test():
-    # random_checks()
-    _id = request.args.get("id")
-    seg = request.args.get("seg")
-    if not seg or not _id:
-        return make_response("Invalid arguments, id and seg", 400)
-    start_regeneration_job(ObjectId(_id), seg)
+    random_checks()
+
+#     _id = request.args.get("id")
+#     seg = request.args.get("seg")
+#     if not seg or not _id:
+#         return make_response("Invalid arguments, id and seg", 400)
+#     start_regeneration_job(ObjectId(_id), seg)
     return make_response("success", 200)
 
 

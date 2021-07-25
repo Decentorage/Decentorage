@@ -52,7 +52,6 @@ def heartbeat_handler(authorized_username):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, "Database server error.")
-    random_checks()
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     
@@ -81,7 +80,7 @@ def heartbeat_handler(authorized_username):
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
         else:
             abort(429, 'Heartbeat Ignored')
-
+        random_checks()
         storage_nodes.update_one(query, new_values)
         return flask.Response(status=200, response="Heartbeat successful.")
 
@@ -107,6 +106,8 @@ def random_checks():
     if uploaded_files_count != 0:
         random_index = random.randint(0, uploaded_files_count - 1)
         print("Print random index", random_index, uploaded_files_count)
+    else:
+        return
 
     file = uploaded_files[random_index]
     check_regeneration(file, storage_nodes, files)
