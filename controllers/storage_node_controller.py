@@ -2,10 +2,10 @@ from flask import make_response, jsonify
 from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler,\
     get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler, \
     random_checks, get_active_contracts, get_storage_info_handler
-from utils import create_token
+from utils import create_token, start_regeneration_job
 from flask import request
 import re
-
+from bson.objectid import ObjectId
 
 @authorize_storage
 def heartbeat(authorized_username):
@@ -51,7 +51,12 @@ def storage_signin():
 
 def test():
     random_checks()
-    # start_regeneration_job(1, 1, True)
+
+#     _id = request.args.get("id")
+#     seg = request.args.get("seg")
+#     if not seg or not _id:
+#         return make_response("Invalid arguments, id and seg", 400)
+#     start_regeneration_job(ObjectId(_id), seg)
     return make_response("success", 200)
 
 
