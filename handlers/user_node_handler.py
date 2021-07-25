@@ -62,6 +62,7 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     try:
         # start tcp connection with storage node
         client_socket = socket.socket()
+        client_socket.settimeout(2)
         print(ip_address)
         print(decentorage_port)
         client_socket.connect((ip_address, decentorage_port))
@@ -75,7 +76,6 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     except socket.error:
         print("disconnected")
         return port
-
     client_socket.close()
 
 
@@ -201,6 +201,7 @@ def create_file_handler(authorized_username, new_file):
         segments_list.append({
             "k": segment["k"],
             "m": segment["m"],
+            "regeneration_count": 0,
             "shard_size": segment["shard_size"],
             "shards": shard_list,
             "regeneration_count": 0
@@ -508,6 +509,7 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
         query = {"username": storage_node["username"]}
         new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
         storage_nodes.update_one(query, new_values)
+        new_wallet_address = storage_node["wallet_address"]
 
         storage_node = storage_nodes.find_one({"username": old_storage_username})
         # Remove contract from active contracts of old storage node
@@ -528,7 +530,6 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
 
 
 # _________________________________ Contract Handlers _________________________________#
-# TODO create a function to decrement download_count when file download ends
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -579,6 +580,7 @@ def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authenti
         client_socket = socket.socket()
         print(ip_address)
         print(decentorage_port)
+        client_socket.settimeout(2)
         client_socket.connect((ip_address, int(decentorage_port)))
         print("connected")
         client_socket.sendall(req)
@@ -653,4 +655,9 @@ def start_download_handler(authorized_username, filename):
                 abort(500, "File is lost.")
         segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
                                    "shard_size": segment["shard_size"]})
+        # Decrement downloads
+        query = {"username": authorized_username, "filename": filename}
+        new_values = {"$inc": {"download_count": -1}}
+        files.update_one(query, new_values)
+
     return make_response(jsonify({'segments': segments_to_return}), 200)
