@@ -418,13 +418,6 @@ def user_shard_done_uploading_handler(authorized_username, shard_id_original, au
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".audits": audits,
                 }
         }
-        try:
-            storage_nodes = app.database["storage_nodes"]
-            storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
-            contract = web3_library.get_contract(file["contract"])
-            web3_library.add_node(contract, storage_node["wallet_address"])
-        except:
-            print("error in adding storage node to contract")
     else:
         new_values = {
             "$set":

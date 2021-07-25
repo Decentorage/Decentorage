@@ -335,7 +335,7 @@ def get_contract_from_storage_node(active_contracts, shard_id):
     for index, active in enumerate(active_contracts):
         if active["shard_id"] == shard_id:
             return active, index
-    return None
+    return None, None
 
 
 def storage_node_address_with_contract_nodes(contract, storage_address):
@@ -368,18 +368,20 @@ def withdraw_handler(authorized_username, shard_id):
             storage_wallet_address = storage_node["wallet_address"]
             active_contracts = storage_node["active_contracts"]
             # get contract element from storage active contracts
-            contract, contract_index = get_contract_from_storage_node(active_contracts, shard_id)
+            contract_info, contract_index = get_contract_from_storage_node(active_contracts, shard_id)
+            if not contract_info:
+                return make_response("No contract available.", 404)
             # read contract details.
-            contract_address = contract['contract_address']
-            payments_count_left = contract['payments_count_left']
+            contract_address = contract_info['contract_address']
+            payments_count_left = contract_info['payments_count_left']
             payment = 0
             now = datetime.datetime.utcnow()
-            next_payment_date = contract['next_payment_date']
+            next_payment_date = contract_info['next_payment_date']
             withdrawn = False
             # Calculate the payment amount the storage node will take
             while (next_payment_date < now) and (payments_count_left > 0):
                 print("withdraw--")
-                payment += availability * contract['payment_per_interval'] / 100
+                payment += availability * contract_info['payment_per_interval'] / 100
                 payments_count_left -= 1
                 next_payment_date = next_payment_date + datetime.timedelta(minutes=5)
                 withdrawn = True
@@ -390,17 +392,19 @@ def withdraw_handler(authorized_username, shard_id):
             in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
             print(availability, Configuration.minimum_availability_threshold, in_contract)
             if availability > Configuration.minimum_availability_threshold and in_contract:
+                print(storage_wallet_address, payment)
                 web3_library.pay_storage_node(contract, storage_wallet_address, payment)
                 active_contracts[contract_index] = {
                     "shard_id": shard_id,
                     "contract_address": contract_address,
                     "next_payment_date": next_payment_date,
                     "payments_count_left": payments_count_left,
-                    "payment_per_interval": contract['payment_per_interval']
+                    "payment_per_interval": contract_info['payment_per_interval']
                 }
                 query = {"username": authorized_username}
                 new_values = {"$set": {"active_contracts": active_contracts}}
                 storage_nodes.update_one(query, new_values)
+                return make_response("payment successful", 200)
             else:
                 return make_response("availability is not good enough", 400)
     else:
@@ -530,20 +534,22 @@ def storage_shard_done_uploading_handler(shard_id_original):
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
                 }
         }
-        try:
-            storage_nodes = get_storage_nodes_collection()
-            storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
-            contract = web3_library.get_contract(file["contract"])
-            web3_library.add_node(contract, storage_node["wallet_address"])
-        except:
-            print("Storage node not added to contract")
     else:
         new_values = {
             "$set":
                 {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".done_uploading": True,
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
                 }
         }
+    try:
+        storage_nodes = get_storage_nodes_collection()
+        storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+        contract = web3_library.get_contract(file["contract"])
+        web3_library.add_node(contract, storage_node["wallet_address"])
+        print("STORAGE HANDLER, Storage node added to contract", shard["shard_node_username"])
+    except:
+        print("Storage node not added to contract", shard["shard_node_username"])
     # Update file document
     files.update_one(query, new_values)
     return True

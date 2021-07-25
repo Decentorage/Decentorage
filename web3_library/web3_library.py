@@ -42,7 +42,7 @@ def create_contract(payment_limit = 499):
 
 def pay_storage_node(contract, storage_address, payment):
     nonce = w3.eth.getTransactionCount(w3.eth.defaultAccount)
-    transaction = contract.functions.payStorageNode(storage_address, payment).buildTransaction({
+    transaction = contract.functions.payStorageNode(str(storage_address), int(payment)).buildTransaction({
         'gas': 1000000,
         'gasPrice': w3.toWei('10', 'gwei'),
         'from': w3.eth.defaultAccount,
