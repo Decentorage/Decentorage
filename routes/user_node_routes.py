@@ -26,7 +26,6 @@ def add_user_urls():
     app.app.add_url_rule(user_url_prefix + "/shardFailedUploading", view_func=user_shard_failed_uploading,
                          methods=["POST"])
     app.app.add_url_rule(user_url_prefix + "/verifyTransaction", view_func=verify_transaction, methods=["POST"])
-    # TODO: Regeneration check the threshold and swap in smart contract and database.
+    # TODO: Regeneration check the threshold and (swap in smart contract).
     # TODO: Shard failed to upload swap, add to the contract if done uploading.
-    # TODO: Download done
-    # TODO: check time constraint in storage withdraw
+    # TODO: Download failed

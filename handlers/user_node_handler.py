@@ -11,6 +11,7 @@ import web3_library
 from utils import registration_verify_user, registration_add_user
 import random
 import string
+from utils import Configuration
 
 
 # _________________________________ PLACEHOLDER _________________________________ #
@@ -61,6 +62,7 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     try:
         # start tcp connection with storage node
         client_socket = socket.socket()
+        client_socket.settimeout(2)
         print(ip_address)
         print(decentorage_port)
         client_socket.connect((ip_address, decentorage_port))
@@ -74,7 +76,6 @@ def check_connection(node, shard_id, shared_authentication_key, shard_size):
     except socket.error:
         print("disconnected")
         return port
-
     client_socket.close()
 
 
@@ -200,8 +201,10 @@ def create_file_handler(authorized_username, new_file):
         segments_list.append({
             "k": segment["k"],
             "m": segment["m"],
+            "regeneration_count": 0,
             "shard_size": segment["shard_size"],
-            "shards": shard_list
+            "shards": shard_list,
+            "regeneration_count": 0
         })
     query = {"_id": _id}
     new_values = {"$set": {"segments": segments_list}}
@@ -253,12 +256,13 @@ def pay_contract_handler(authorized_username):
     segments = file["segments"]
     # calculate next payment date for storage nodes, how much payment left, and payment per week.
     now = datetime.datetime.utcnow()
-    next_payment_date = now + datetime.timedelta(minutes=5)             # datetime.timedelta(days=7)
+    next_payment_date = now + datetime.timedelta(minutes=5)             # now + datetime.timedelta(days=7)
     total_number_of_shards = 0
     for segment in segments:
         total_number_of_shards += segment['m']
-    payment_left = file['price'] / total_number_of_shards
-    payment_per_week = payment_left / 4                                 # (file['duration_in_months'] * 4)
+    total_payment = (Configuration.storage_node_share * file['price']) / total_number_of_shards
+    payments_count_left = (file['duration_in_months'] * 4)
+    payment_per_interval = total_payment / payments_count_left
 
     print("--------------START--------------")
     for i, segment in enumerate(segments):
@@ -284,13 +288,12 @@ def pay_contract_handler(authorized_username):
             index_unused = 0
 
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
-            for j, index in enumerate(unordered_possible_storage_nodes_indices):
+            for index in unordered_possible_storage_nodes_indices:
                 print("--------------START4--------------")
                 shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
                 shared_authentication_key = ''.join(
                     random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(10))
 
-                # TODO check if node is alive
                 fail = False
                 port = check_connection(possible_storage_nodes[index], shard_id, shared_authentication_key, shard_size)
                 print("first try", index)
@@ -311,7 +314,7 @@ def pay_contract_handler(authorized_username):
                 # TODO send authentication key, inform storage node, and get portclientSocket = socket.socket()
 
                 # Storage node update
-                current_storage_node = possible_storage_nodes[index]        # ...
+                current_storage_node = possible_storage_nodes[index]
                 storage_node_username = current_storage_node["username"]
                 ip_address = current_storage_node["ip_address"]
 
@@ -320,8 +323,8 @@ def pay_contract_handler(authorized_username):
                     "shard_id": shard_id,
                     "contract_address": contract,
                     "next_payment_date": next_payment_date,
-                    "payment_left": payment_left,
-                    "payment_per_week": payment_per_week
+                    "payments_count_left": payments_count_left,
+                    "payment_per_interval": payment_per_interval
                 }}
                 query = {"username": storage_node_username}
                 new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
@@ -506,6 +509,7 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
         query = {"username": storage_node["username"]}
         new_values = {"$set": {"available_space": new_available_space}, "$push": new_contracts_entry}
         storage_nodes.update_one(query, new_values)
+        new_wallet_address = storage_node["wallet_address"]
 
         storage_node = storage_nodes.find_one({"username": old_storage_username})
         # Remove contract from active contracts of old storage node
@@ -526,7 +530,6 @@ def assign_another_storage_to_shard(authorized_username, shard_id_original):
 
 
 # _________________________________ Contract Handlers _________________________________#
-# TODO create a function to decrement download_count when file download ends
 def get_contract_handler(authorized_username):
     files = app.database["files"]
     if not files:
@@ -577,6 +580,7 @@ def get_port(ip_address, decentorage_port, shard_id, shard_size, shared_authenti
         client_socket = socket.socket()
         print(ip_address)
         print(decentorage_port)
+        client_socket.settimeout(2)
         client_socket.connect((ip_address, int(decentorage_port)))
         print("connected")
         client_socket.sendall(req)
@@ -618,7 +622,7 @@ def start_download_handler(authorized_username, filename):
                 break
             if shard["shard_lost"]:
                 continue
-            # TODO try to open a port on storage_node to receive data
+
             query = {"username": shard["shard_node_username"]}
             storage_node = storage_nodes.find_one(query)
             ip_address = storage_node["ip_address"]
@@ -651,4 +655,9 @@ def start_download_handler(authorized_username, filename):
                 abort(500, "File is lost.")
         segments_to_return.append({"shards": shards_to_return, "m": segment["m"], "k": segment["k"],
                                    "shard_size": segment["shard_size"]})
+        # Decrement downloads
+        query = {"username": authorized_username, "filename": filename}
+        new_values = {"$inc": {"download_count": -1}}
+        files.update_one(query, new_values)
+
     return make_response(jsonify({'segments': segments_to_return}), 200)

@@ -1,12 +1,15 @@
 import datetime
 import math
 import random
+import socket
+from utils import start_regeneration_job
 import flask
 import app
+import json
 import web3_library
 from bson.objectid import ObjectId
 from functools import wraps
-from flask import abort, request
+from flask import abort, request, make_response
 import jwt
 from utils import registration_verify_user, registration_add_user, Configuration
 # _________________________________ Check database functions _________________________________#
@@ -49,7 +52,7 @@ def heartbeat_handler(authorized_username):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, "Database server error.")
-
+    random_checks()
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     
@@ -78,7 +81,7 @@ def heartbeat_handler(authorized_username):
             new_values = {"$set": {"last_heartbeat": new_last_heartbeat, "heartbeats": heartbeats}}
         else:
             abort(429, 'Heartbeat Ignored')
-        # TODO: Check random storage node availability, New thread.
+
         storage_nodes.update_one(query, new_values)
         return flask.Response(status=200, response="Heartbeat successful.")
 
@@ -109,12 +112,36 @@ def random_checks():
     check_regeneration(file, storage_nodes, files)
 
 
+def send_audit(shard, ip_address, port):
+    audits = shard["audits"]
+    audits_number = len(audits)
+    audit_idx = random.randint(0, audits_number - 1)
+    salt = audits[audit_idx]["salt"]
+    audit_hash = audits[audit_idx]["hash"]
+
+    req = {"type": "audit", "salt": salt, "shard_id": shard["shard_id"]}
+    req = json.dumps(req).encode('utf-8')
+
+    try:
+        # start tcp connection with storage node
+        client_socket = socket.socket()
+        client_socket.settimeout(2)
+        client_socket.connect((ip_address, port))
+        client_socket.sendall(req)
+        result = client_socket.recv(1024).decode("utf-8")
+
+        return result == audit_hash
+
+    except socket.error:
+        return False
+
+
 def check_regeneration(file, storage_nodes, files):
     print(file["filename"])
-
+    id = file["_id"]
     i = 0
     # loop on all segments and all shards.
-    for segment in file["segments"]:
+    for seg_no, segment in enumerate(file["segments"]):
         number_of_active_shards = 0
         for shard in segment["shards"]:
             # If shard is not lost check termination for the storage node.
@@ -123,7 +150,13 @@ def check_regeneration(file, storage_nodes, files):
                 is_terminated = check_termination(storage_node, storage_nodes, files)
                 # If not terminated increment the number of active shards
                 if not is_terminated:
-                    number_of_active_shards += 1
+                    audit_passed = send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
+                    if not audit_passed:
+                        print("audits didn't pass.")
+                        terminate_storage_node(storage_node, storage_nodes, files)
+                    else:
+                        print("audits passed.")
+                        number_of_active_shards += 1
         # if the number of active shards is less than minimum data shards needed therefore this segment is lost
         if number_of_active_shards < segment['k']:
             print("segment is lost")
@@ -131,20 +164,23 @@ def check_regeneration(file, storage_nodes, files):
         # if the number of extra shards is less than minimum number needed then regenerate this segment.
         if (number_of_active_shards - segment['k']) <= Configuration.minimum_regeneration_threshold:
             print("Regenerate")
-            # TODO: Call regeneration for this segment in this file
-            pass
+            query = {"_id": ObjectId(id)}
+            new_values = {"$set": {"segments."+str(seg_no)+".regeneration_count": segment['regeneration_count'] + 1}}
+            start_regeneration_job(id, seg_no)
         else:
             print("Segment#", i, "Not regenerated")
         i += 1
 
 
-def check_termination(storage_node, storage_nodes, files):
+def check_termination(storage_node, storage_nodes, files=None):
     storage_availability = get_availability(storage_node)
-    print(storage_node["username"], ":", storage_availability, "Terminate flag:",
+    print(storage_node["username"], ":", storage_availability, "should be terminated:",
           storage_availability < Configuration.minimum_availability_threshold)
     if storage_availability > Configuration.minimum_availability_threshold:
         return False
     else:
+        if not files:
+            files = app.database['files']
         terminate_storage_node(storage_node, storage_nodes, files)
         return True
 
@@ -168,7 +204,7 @@ def terminate_storage_node(storage_node, storage_nodes, files):
         files.update_one(query, new_values)
 
     query = {"username": storage_node["username"]}
-    new_values = {"$set": {"is_terminated": True, "available_space": 0, "active_contracts": []}}
+    new_values = {"$set": {"is_terminated": True, "available_space": 0}}
     storage_nodes.update_one(query, new_values)
 
 
@@ -297,10 +333,11 @@ def get_availability(storage_node):
         return availability
 
 
-def get_contract_address_from_storage_node(active_contracts, shard_id):
-    for active in active_contracts:
+def get_contract_from_storage_node(active_contracts, shard_id):
+    for index, active in enumerate(active_contracts):
         if active["shard_id"] == shard_id:
-            return active["contract_address"]
+            return active, index
+    return None, None
 
 
 def storage_node_address_with_contract_nodes(contract, storage_address):
@@ -311,7 +348,6 @@ def storage_node_address_with_contract_nodes(contract, storage_address):
     return False
 
 
-# TODO: the function not tested yet should be tested later
 def withdraw_handler(authorized_username, shard_id):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
@@ -319,22 +355,83 @@ def withdraw_handler(authorized_username, shard_id):
     query = {"username": authorized_username, "is_terminated": False}
     storage_node = storage_nodes.find_one(query)
     # secret_key = os.environ["m"]
+
     if storage_node:
-        availability = get_availability(storage_node)   # Availability in percentage [0, 100].
-        # TODO: calculate payment based on availability
-        payment = availability
-        storage_wallet_address = storage_node["wallet_address"]
-        active_contracts = storage_node["active_contracts"]
-        contract_address = get_contract_address_from_storage_node(active_contracts, shard_id)
-        contract = web3_library.get_contract(contract_address)
-        in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
-        # TODO: check for payment date before transfer the money
-        if availability > Configuration.minimum_availability_threshold and in_contract:
-            web3_library.pay_storage_node(contract, storage_wallet_address, payment)
-        else:
-            return "availability is not good enough"
+        is_terminated = check_termination(storage_node, storage_nodes)
+        if not is_terminated:
+            availability = get_availability(storage_node)             # Availability in percentage [0, 100].
+            # if availability above full payment threshold, the storage node get full payment
+            if availability >= Configuration.full_payment_threshold:
+                print("Storage: ", storage_node['username'], "full payment")
+                availability = 100
+            else:
+                print("Storage: ", storage_node['username'], availability, " payment")
+
+            storage_wallet_address = storage_node["wallet_address"]
+            active_contracts = storage_node["active_contracts"]
+            # get contract element from storage active contracts
+            contract_info, contract_index = get_contract_from_storage_node(active_contracts, shard_id)
+            if not contract_info:
+                return make_response("No contract available.", 404)
+            # read contract details.
+            contract_address = contract_info['contract_address']
+            payments_count_left = contract_info['payments_count_left']
+            payment = 0
+            now = datetime.datetime.utcnow()
+            next_payment_date = contract_info['next_payment_date']
+            withdrawn = False
+            # Calculate the payment amount the storage node will take
+            while (next_payment_date < now) and (payments_count_left > 0):
+                print("withdraw--")
+                payment += availability * contract_info['payment_per_interval'] / 100
+                payments_count_left -= 1
+                next_payment_date = next_payment_date + datetime.timedelta(minutes=5)
+                withdrawn = True
+            if not withdrawn:
+                return make_response("No payment available now.", 404)
+
+            contract = web3_library.get_contract(contract_address)
+            in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
+            print(availability, Configuration.minimum_availability_threshold, in_contract)
+
+            files = app.database['files']
+            shard_id_original = shard_id
+            shard_id = shard_id_original.encode('utf-8')
+            shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+            shard_id_split = shard_id.split("$DCNTRG$")
+            document_id = shard_id_split[0]
+            segment_no = int(shard_id_split[1])
+            shard_no = int(shard_id_split[2])
+            shard_id = shard_id_original
+
+            file = files.find_one({"_id": ObjectId(document_id)})
+            if not file:
+                return make_response("no file found", 404)
+            shard = file['segments'][segment_no]['shards'][shard_no]
+            audit_passed = send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
+            if not audit_passed:
+                print("audits didn't pass.")
+                terminate_storage_node(storage_node, storage_nodes, files)
+                return make_response("Audit didn't pass", 400)
+
+            if availability > Configuration.minimum_availability_threshold and in_contract:
+                print(storage_wallet_address, payment)
+                web3_library.pay_storage_node(contract, storage_wallet_address, payment)
+                active_contracts[contract_index] = {
+                    "shard_id": shard_id,
+                    "contract_address": contract_address,
+                    "next_payment_date": next_payment_date,
+                    "payments_count_left": payments_count_left,
+                    "payment_per_interval": contract_info['payment_per_interval']
+                }
+                query = {"username": authorized_username}
+                new_values = {"$set": {"active_contracts": active_contracts}}
+                storage_nodes.update_one(query, new_values)
+                return make_response("payment successful", 200)
+            else:
+                return make_response("availability is not good enough", 400)
     else:
-        return "Database error."
+        return make_response("Database error.", 500)
 
 
 def get_availability_handler(authorized_username):
@@ -464,9 +561,18 @@ def storage_shard_done_uploading_handler(shard_id_original):
         new_values = {
             "$set":
                 {
+                    "segments." + str(segment_no) + ".shards." + str(shard_no) + ".done_uploading": True,
                     "segments." + str(segment_no) + ".shards." + str(shard_no) + ".storage_node_done": True
                 }
         }
+    try:
+        storage_nodes = get_storage_nodes_collection()
+        storage_node = storage_nodes.find_one({"username": shard["shard_node_username"]})
+        contract = web3_library.get_contract(file["contract"])
+        web3_library.add_node(contract, storage_node["wallet_address"])
+        print("STORAGE HANDLER, Storage node added to contract", shard["shard_node_username"])
+    except:
+        print("Storage node not added to contract", shard["shard_node_username"])
     # Update file document
     files.update_one(query, new_values)
     return True
@@ -477,12 +583,17 @@ def get_storage_info_handler(username):
 
     storage_node = storage_nodes.find_one({"username": username})
     response = []
+    availability = get_availability(storage_node)
+
     for active_contract in storage_node['active_contracts']:
+
+        payment_left = availability * active_contract['payment_per_interval'] * \
+                       active_contract['payments_count_left'] / 100
         response.append({
             "shard_id": active_contract['shard_id'],
             "next_payment_date": active_contract['next_payment_date'],
-            "payment_left": active_contract['payment_left'],
-            "payment_per_week": active_contract['payment_per_week']
+            "payment_left": payment_left,
+            "payment_per_interval": active_contract['payment_per_interval']
         })
-    availability = get_availability(storage_node)
+    print(response)
     return availability, response

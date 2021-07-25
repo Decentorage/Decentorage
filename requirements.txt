@@ -1,4 +1,5 @@
 aiohttp==3.7.4.post0
+argo-workflows==5.0.0
 async-timeout==3.0.1
 attrs==21.2.0
 base58==2.1.0
@@ -11,6 +12,7 @@ chardet==4.0.0
 charset-normalizer==2.0.1
 click==8.0.1
 colorama==0.4.4
+cryptography==3.4.7
 cytoolz==0.11.0
 dnspython==1.16.0
 eth-abi==2.1.1
@@ -42,6 +44,8 @@ pycryptodome==3.10.1
 PyJWT==2.1.0
 pymongo==3.11.4
 pyrsistent==0.18.0
+python-dateutil==2.8.2
+PyYAML==5.4.1
 requests==2.26.0
 rlp==2.0.1
 six==1.16.0
@@ -55,4 +59,3 @@ Werkzeug==2.0.1
 WTForms==2.3.3
 yarl==1.6.3
 zipp==3.5.0
-cryptography==3.1.1

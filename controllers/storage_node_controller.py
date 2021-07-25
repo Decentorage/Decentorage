@@ -2,10 +2,10 @@ from flask import make_response, jsonify
 from handlers import heartbeat_handler, add_storage, verify_storage, authorize_storage, withdraw_handler,\
     get_availability_handler, test_contract_handler, update_connection_handler, storage_shard_done_uploading_handler, \
     random_checks, get_active_contracts, get_storage_info_handler
-from utils import create_token
+from utils import create_token, start_regeneration_job
 from flask import request
 import re
-
+from bson.objectid import ObjectId
 
 @authorize_storage
 def heartbeat(authorized_username):
@@ -50,7 +50,12 @@ def storage_signin():
 
 
 def test():
-    random_checks()
+    # random_checks()
+    _id = request.args.get("id")
+    seg = request.args.get("seg")
+    if not seg or not _id:
+        return make_response("Invalid arguments, id and seg", 400)
+    start_regeneration_job(ObjectId(_id), seg)
     return make_response("success", 200)
 
 
@@ -60,7 +65,7 @@ def withdraw(authorized_username):
     if shard_id:
         return withdraw_handler(authorized_username, shard_id)
     else:
-        return "shard id is missing from request body"
+        return make_response("shard id is missing from request body", 400)
 
 
 @authorize_storage
@@ -124,6 +129,6 @@ def storage_shard_done_uploading(authorized_username):
 def get_storage_info(authorized_username):
     try:
         availability, contracts_info = get_storage_info_handler(authorized_username)
-        return make_response(jsonify({"availability": availability, "contracts_info": contracts_info}), 200)
+        return make_response(jsonify({"availability": str(availability), "contracts_info": contracts_info}), 200)
     except:
         return make_response("server error", 500)

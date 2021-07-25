@@ -5,3 +5,4 @@ README.md
 set_env.bash
 set_env.cmd
 decent/
+venv/
