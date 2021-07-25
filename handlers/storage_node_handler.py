@@ -165,6 +165,8 @@ def check_regeneration(file, storage_nodes, files):
         # if the number of extra shards is less than minimum number needed then regenerate this segment.
         if (number_of_active_shards - segment['k']) <= Configuration.minimum_regeneration_threshold:
             print("Regenerate")
+            query = {"_id": ObjectId(id)}
+            new_values = {"$set": {"segments."+str(seg_no)+".regeneration_count": segment['regeneration_count'] + 1}}
             start_regeneration_job(id, seg_no)
         else:
             print("Segment#", i, "Not regenerated")
@@ -203,7 +205,7 @@ def terminate_storage_node(storage_node, storage_nodes, files):
         files.update_one(query, new_values)
 
     query = {"username": storage_node["username"]}
-    new_values = {"$set": {"is_terminated": True, "available_space": 0, "active_contracts": []}}
+    new_values = {"$set": {"is_terminated": True, "available_space": 0}}
     storage_nodes.update_one(query, new_values)
 
 
