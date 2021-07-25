@@ -203,7 +203,8 @@ def create_file_handler(authorized_username, new_file):
             "m": segment["m"],
             "regeneration_count": 0,
             "shard_size": segment["shard_size"],
-            "shards": shard_list
+            "shards": shard_list,
+            "regeneration_count": 0
         })
     query = {"_id": _id}
     new_values = {"$set": {"segments": segments_list}}
@@ -287,7 +288,7 @@ def pay_contract_handler(authorized_username):
             index_unused = 0
 
             del unordered_possible_storage_nodes_indices[unassigned_shards:]
-            for j, index in enumerate(unordered_possible_storage_nodes_indices):
+            for index in unordered_possible_storage_nodes_indices:
                 print("--------------START4--------------")
                 shard_id = segments[i]["shards"][unassigned_shards-1]["shard_id"]
                 shared_authentication_key = ''.join(
