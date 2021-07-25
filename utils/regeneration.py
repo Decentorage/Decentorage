@@ -1,4 +1,3 @@
-from pymongo import database
 import yaml
 import os
 import app
@@ -6,19 +5,27 @@ from argo.workflows.client import ( ApiClient,
 									WorkflowServiceApi,
 									Configuration,
 									V1alpha1WorkflowCreateRequest)
-
+import requests
 
 def start_regeneration_job(file_id, seg_no, test=False):
+	seg_no = int(seg_no)
 	host = os.environ["ARGO_URI"]
 	if not test:
 		database = app.database
+		if not database:
+			print("database error")
+			return
 		files = database["files"]
+		print(file_id,seg_no)
 		query = {"_id": file_id}
 		file = files.find_one(query)
+		if not file:
+			print("No file exist.")
+			return
 		segment = file["segments"][seg_no]
 		regeneration_count = segment["regeneration_count"]
 	else:
-		regeneration_count = 2
+		regeneration_count = 23
 	config = Configuration(host=host)
 	client = ApiClient(configuration=config)
 	service = WorkflowServiceApi(api_client=client)
