@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: regeneration
+spec:
+  entrypoint: regenerate-file
+  templates:
+  - name: regenerate-file
+    inputs:
+      parameters:
+        - name: file_id
+          value: placeholder
+        - name: segment_no
+          value: placeholder
+    container:
+      image: decentorage/regeneration-node:0.3
+      command: [python]
+      # Change this to be ["regenerate.py","--id","{{inputs.parameters.file_id}}", "--seg","{{inputs.parameters.segment_no}}"]
+      args: ["test.py","--msg","{{inputs.parameters.file_id}}"] 
