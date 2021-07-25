@@ -52,7 +52,7 @@ def heartbeat_handler(authorized_username):
     storage_nodes = get_storage_nodes_collection()
     if not storage_nodes:
         abort(500, "Database server error.")
-
+    random_checks()
     query = {"username": authorized_username}
     storage_node = storage_nodes.find_one(query)
     
@@ -83,7 +83,6 @@ def heartbeat_handler(authorized_username):
             abort(429, 'Heartbeat Ignored')
 
         storage_nodes.update_one(query, new_values)
-        random_checks()
         return flask.Response(status=200, response="Heartbeat successful.")
 
 
@@ -403,7 +402,11 @@ def withdraw_handler(authorized_username, shard_id):
             document_id = shard_id_split[0]
             segment_no = int(shard_id_split[1])
             shard_no = int(shard_id_split[2])
+            shard_id = shard_id_original
+
             file = files.find_one({"_id": ObjectId(document_id)})
+            if not file:
+                return make_response("no file found", 404)
             shard = file['segments'][segment_no]['shards'][shard_no]
             audit_passed = send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
             if not audit_passed:
