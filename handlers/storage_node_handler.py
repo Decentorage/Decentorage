@@ -83,6 +83,7 @@ def heartbeat_handler(authorized_username):
             abort(429, 'Heartbeat Ignored')
 
         storage_nodes.update_one(query, new_values)
+        random_checks()
         return flask.Response(status=200, response="Heartbeat successful.")
 
 
@@ -108,7 +109,7 @@ def random_checks():
         random_index = random.randint(0, uploaded_files_count - 1)
         print("Print random index", random_index, uploaded_files_count)
 
-    file = uploaded_files[3]  # random_index
+    file = uploaded_files[random_index]
     check_regeneration(file, storage_nodes, files)
 
 
@@ -391,6 +392,23 @@ def withdraw_handler(authorized_username, shard_id):
             contract = web3_library.get_contract(contract_address)
             in_contract = storage_node_address_with_contract_nodes(contract, storage_wallet_address)
             print(availability, Configuration.minimum_availability_threshold, in_contract)
+
+            files = app.database['files']
+            shard_id_original = shard_id
+            shard_id = shard_id_original.encode('utf-8')
+            shard_id = app.fernet.decrypt(shard_id).decode('utf-8')
+            shard_id_split = shard_id.split("$DCNTRG$")
+            document_id = shard_id_split[0]
+            segment_no = int(shard_id_split[1])
+            shard_no = int(shard_id_split[2])
+            file = files.find_one({"_id": ObjectId(document_id)})
+            shard = file['segments'][segment_no]['shards'][shard_no]
+            audit_passed = send_audit(shard, storage_node["ip_address"], int(storage_node["port"]))
+            if not audit_passed:
+                print("audits didn't pass.")
+                terminate_storage_node(storage_node, storage_nodes, files)
+                return make_response("Audit didn't pass", 400)
+
             if availability > Configuration.minimum_availability_threshold and in_contract:
                 print(storage_wallet_address, payment)
                 web3_library.pay_storage_node(contract, storage_wallet_address, payment)
@@ -561,7 +579,9 @@ def get_storage_info_handler(username):
     storage_node = storage_nodes.find_one({"username": username})
     response = []
     availability = get_availability(storage_node)
+
     for active_contract in storage_node['active_contracts']:
+
         payment_left = availability * active_contract['payment_per_interval'] * \
                        active_contract['payments_count_left'] / 100
         response.append({
@@ -570,4 +590,5 @@ def get_storage_info_handler(username):
             "payment_left": payment_left,
             "payment_per_interval": active_contract['payment_per_interval']
         })
+    print(response)
     return availability, response
