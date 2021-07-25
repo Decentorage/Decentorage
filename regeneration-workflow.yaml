@@ -14,7 +14,7 @@ spec:
         - name: segment_no
           value: placeholder
     container:
-      image: decentorage/regeneration-node:2.5
+      image: decentorage/regeneration-node:3.1
       command: [python]
       # args: ["test.py","--msg","{{inputs.parameters.file_id}}"] 
       args: ["regenerate.py","--id","{{inputs.parameters.file_id}}", "--seg","{{inputs.parameters.segment_no}}"]
